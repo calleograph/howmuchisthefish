@@ -11,6 +11,7 @@ import { RolesGuard } from './modules/auth/roles.guard';
 import { JwtAuthGuard } from './modules/auth/jwt-auth.guard';
 import { EmployeesModule } from './modules/employees/employees.module';
 import { GroupsModule } from './modules/groups/groups.module';
+import { TemplatesModule } from './modules/templates/templates.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { GroupsModule } from './modules/groups/groups.module';
     AuthModule,
     EmployeesModule,
     GroupsModule,
+    TemplatesModule,
   ],
   providers: [
     // Порядок важен: Throttler → JwtAuthGuard (заполняет req.user) → RolesGuard (читает req.user).
