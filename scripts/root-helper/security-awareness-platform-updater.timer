@@ -1,0 +1,10 @@
+[Unit]
+Description=Периодически проверяет каталог обмена на запросы root-helper
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=10s
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target

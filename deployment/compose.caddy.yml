@@ -1,0 +1,25 @@
+# Override для встроенного HTTPS (путь установки по умолчанию, задание §4.1).
+# Использование: docker compose -f compose.yml -f compose.caddy.yml up -d
+# (scripts/install.sh делает это автоматически, когда администратор выбрал
+# "встроенный HTTPS" на шаге настройки).
+
+services:
+  caddy:
+    image: caddy:2.9-alpine@sha256:b4e3952384eb9524a887633ce65c752dd7c71314d2c2acf98cd5c715aaa534f0
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?Задайте DOMAIN в .env (например sap.example.com) для встроенного HTTPS}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - backend
+      - frontend
+
+volumes:
+  caddy-data:
+  caddy-config:

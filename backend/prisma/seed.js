@@ -1,12 +1,16 @@
 /**
  * Создаёт первого администратора. Используется:
  *  - в разработке: `npm run seed`
- *  - установщиком (scripts/install.sh) при первом запуске на чистом сервере —
- *    пароль передаётся через переменные окружения и печатается ТОЛЬКО в /dev/tty,
- *    никогда в файл или лог (см. docs/INSTALL.md).
+ *  - установщиком (scripts/install.sh) в production-контейнере —
+ *    пароль передаётся через переменные окружения и печатается ТОЛЬКО
+ *    вызывающей стороной в /dev/tty, никогда в файл или лог (см. docs/INSTALL.md).
+ *
+ * Обычный JS, не TypeScript: production-образ ставится через
+ * `npm ci --omit=dev` (без ts-node) — компилировать отдельный скрипт вне
+ * общего `nest build` pipeline ради него одного не стоит усложнения.
  */
-import { PrismaClient } from '@prisma/client';
-import * as bcrypt from 'bcrypt';
+const { PrismaClient } = require('@prisma/client');
+const bcrypt = require('bcrypt');
 
 const prisma = new PrismaClient();
 

@@ -1,0 +1,15 @@
+# Override для работы за внешним reverse proxy организации (задание §4.2).
+# Использование: docker compose -f compose.yml -f compose.external-proxy.yml up -d
+# Backend и frontend публикуют порты ТОЛЬКО на loopback (127.0.0.1) — внешний
+# nginx/Caddy/Traefik организации сам слушает 80/443 и проксирует сюда.
+# Публичный REST API — под /api на backend-порту, остальное (/, /lp/*, /t/*
+# тоже обслуживаются backend) — см. README "Reverse-proxy маршрутизация".
+
+services:
+  backend:
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-3000}:3000"
+
+  frontend:
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-8080}:80"

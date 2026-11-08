@@ -1,0 +1,23 @@
+{$DOMAIN} {
+	# Публичные/API-пути уходят на backend (он сам слушает их без префикса /api,
+	# кроме REST API под /api — см. backend/src/main.ts setGlobalPrefix).
+	handle /api/* {
+		reverse_proxy backend:3000
+	}
+	handle /health {
+		reverse_proxy backend:3000
+	}
+	handle /lp/* {
+		reverse_proxy backend:3000
+	}
+	handle /t/* {
+		reverse_proxy backend:3000
+	}
+
+	# Всё остальное — статика SPA фронтенда.
+	handle {
+		reverse_proxy frontend:80
+	}
+
+	encode gzip
+}

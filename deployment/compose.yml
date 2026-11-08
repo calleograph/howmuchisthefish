@@ -1,0 +1,85 @@
+# Security Awareness Platform — Docker Compose (базовая конфигурация).
+#
+# Обязательные переменные без значений по умолчанию (см. .env.example) — если
+# не заданы, compose откажется стартовать, а не тихо захватит порт/откроет
+# слабый пароль. PostgreSQL никогда не публикует порт на хост — доступен
+# только внутри сети compose.
+#
+# Два варианта публикации (задание §4):
+#  1. Встроенный HTTPS (по умолчанию): `docker compose up -d` поднимает этот
+#     файл + compose.caddy.yml — Caddy публикует 80/443 и сам получает
+#     сертификат Let's Encrypt по DOMAIN. См. scripts/install.sh.
+#  2. За внешним reverse proxy организации: `docker compose -f compose.yml
+#     -f compose.external-proxy.yml up -d` — без Caddy, backend/frontend
+#     слушают на 127.0.0.1, свой nginx/Caddy/Traefik организации проксирует.
+
+name: ${COMPOSE_PROJECT_NAME:?Задайте COMPOSE_PROJECT_NAME в .env (например sap)}
+
+services:
+  postgres:
+    image: postgres:16-alpine@sha256:aa6cb33cf4c19c765cefcf48d96176258800870a9a1e930ad126200f9d825139
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sap
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Задайте DB_PASSWORD в .env}
+      POSTGRES_DB: sap
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sap -d sap"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Никогда не публикуется на хост — доступен только внутри сети compose.
+
+  backend:
+    image: ${BACKEND_IMAGE:-security-awareness-platform-backend:local}
+    build:
+      context: ../backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://sap:${DB_PASSWORD:?Задайте DB_PASSWORD в .env}@postgres:5432/sap
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?Задайте PUBLIC_BASE_URL в .env (https://ваш-домен)}
+      JWT_SECRET: ${JWT_SECRET:?Задайте JWT_SECRET в .env (openssl rand -hex 32)}
+      JWT_EXPIRES_IN: 24h
+      APP_MASTER_KEY: ${APP_MASTER_KEY:?Задайте APP_MASTER_KEY в .env (openssl rand -hex 32)}
+      STORAGE_ROOT: /data/storage
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      RATE_LIMIT_TTL_SECONDS: 60
+      RATE_LIMIT_MAX: 100
+      OIDC_ENABLED: ${OIDC_ENABLED:-false}
+      OIDC_ISSUER_URL: ${OIDC_ISSUER_URL:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:-}
+      SAML_ENABLED: ${SAML_ENABLED:-false}
+      SAML_IDP_METADATA_URL: ${SAML_IDP_METADATA_URL:-}
+      SAML_ENTITY_ID: ${SAML_ENTITY_ID:-}
+    volumes:
+      - app-storage:/data/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    # Приоритет живым пользовательским запросам над фоновой рассылкой при
+    # конкуренции за CPU — вес, не потолок (практика перенята у «Переговорки»).
+    cpu_shares: 1024
+
+  frontend:
+    image: ${FRONTEND_IMAGE:-security-awareness-platform-frontend:local}
+    build:
+      context: ../frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+
+volumes:
+  postgres-data:
+  app-storage:
