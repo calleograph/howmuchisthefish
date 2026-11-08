@@ -14,6 +14,9 @@ import { GroupsModule } from './modules/groups/groups.module';
 import { TemplatesModule } from './modules/templates/templates.module';
 import { PagesModule } from './modules/pages/pages.module';
 import { EventsModule } from './modules/events/events.module';
+import { SmtpModule } from './modules/smtp/smtp.module';
+import { MailerModule } from './modules/mailer/mailer.module';
+import { CampaignsModule } from './modules/campaigns/campaigns.module';
 
 @Module({
   imports: [
@@ -45,6 +48,9 @@ import { EventsModule } from './modules/events/events.module';
     TemplatesModule,
     PagesModule,
     EventsModule,
+    SmtpModule,
+    MailerModule,
+    CampaignsModule,
   ],
   providers: [
     // Порядок важен: Throttler → JwtAuthGuard (заполняет req.user) → RolesGuard (читает req.user).

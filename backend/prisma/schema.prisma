@@ -200,6 +200,9 @@ model CampaignTarget {
 
   events      CampaignEvent[]
 
+  // Один сотрудник не может быть целью одной кампании дважды — делает addTargets
+  // идемпотентным при повторном вызове (например при обновлении состава получателей).
+  @@unique([campaignId, employeeId])
   @@map("campaign_targets")
 }
 
