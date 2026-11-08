@@ -19,6 +19,13 @@ async function bootstrap() {
   );
   app.enableCors({ origin: process.env.PUBLIC_BASE_URL, credentials: true });
 
+  // Префикс api/ для всего REST API администратора — отделяет его от публичных
+  // встраиваемых в письма роутов (/lp/{slug}, /t/*) и от /health, которым префикс
+  // только мешал бы (короткие URL в письмах, Docker healthcheck без него).
+  app.setGlobalPrefix('api', {
+    exclude: ['health', 'lp/(.*)', 't/(.*)'],
+  });
+
   const config = new DocumentBuilder()
     .setTitle('Security Awareness Platform API')
     .setDescription('REST API для управления учебными фишинговыми кампаниями')
