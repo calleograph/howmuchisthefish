@@ -17,6 +17,7 @@ import { EventsModule } from './modules/events/events.module';
 import { SmtpModule } from './modules/smtp/smtp.module';
 import { MailerModule } from './modules/mailer/mailer.module';
 import { CampaignsModule } from './modules/campaigns/campaigns.module';
+import { ReportsModule } from './modules/reports/reports.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { CampaignsModule } from './modules/campaigns/campaigns.module';
     SmtpModule,
     MailerModule,
     CampaignsModule,
+    ReportsModule,
   ],
   providers: [
     // Порядок важен: Throttler → JwtAuthGuard (заполняет req.user) → RolesGuard (читает req.user).
