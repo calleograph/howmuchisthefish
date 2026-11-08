@@ -8,6 +8,9 @@ import { CryptoModule } from './modules/crypto/crypto.module';
 import { HealthModule } from './modules/health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { RolesGuard } from './modules/auth/roles.guard';
+import { JwtAuthGuard } from './modules/auth/jwt-auth.guard';
+import { EmployeesModule } from './modules/employees/employees.module';
+import { GroupsModule } from './modules/groups/groups.module';
 
 @Module({
   imports: [
@@ -34,9 +37,13 @@ import { RolesGuard } from './modules/auth/roles.guard';
     CryptoModule,
     HealthModule,
     AuthModule,
+    EmployeesModule,
+    GroupsModule,
   ],
   providers: [
+    // Порядок важен: Throttler → JwtAuthGuard (заполняет req.user) → RolesGuard (читает req.user).
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
   ],
 })

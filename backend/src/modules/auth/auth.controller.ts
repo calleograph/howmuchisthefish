@@ -1,10 +1,10 @@
-import { Body, Controller, Post, UseGuards, Request } from '@nestjs/common';
+import { Body, Controller, Post, Request } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { LoginThrottleService } from './login-throttle.service';
-import { JwtAuthGuard } from './jwt-auth.guard';
+import { Public } from './public.decorator';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -14,6 +14,7 @@ export class AuthController {
     private readonly throttle: LoginThrottleService,
   ) {}
 
+  @Public()
   @Post('login')
   async login(@Body() dto: LoginDto) {
     this.throttle.assertNotLocked(dto.email);
@@ -28,7 +29,6 @@ export class AuthController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard)
   @Post('me')
   me(@Request() req: any) {
     return req.user;
