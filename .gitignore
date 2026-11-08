@@ -1,0 +1,28 @@
+# Node
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Env / secrets — никогда не коммитить реальные значения
+.env
+.env.local
+.env.*.local
+
+# Логи
+*.log
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Данные приложения (при локальном запуске без Docker)
+/data/
+/backend/prisma/dev.db
+
+# Frontend build
+frontend/dist/
+frontend/.vite/
