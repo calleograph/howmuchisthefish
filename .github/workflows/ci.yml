@@ -132,9 +132,21 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Запустить gitleaks (сканирование всей истории, не только diff)
+        # gitleaks-action сама вычисляет диапазон BASE^..HEAD из контекста
+        # push-события — на первом push в новый репозиторий BASE^ (родитель
+        # первого коммита) не существует, и action падает с "ambiguous
+        # argument" вместо реальной проверки. Вызываем gitleaks напрямую без
+        # ограничения диапазона — сканирует всю историю всегда, надёжнее.
+        run: |
+          curl -fsSL https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz \
+            | tar xz -C /usr/local/bin gitleaks
+          gitleaks detect --redact -v --exit-code=1 --report-format=sarif --report-path=results.sarif
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gitleaks-results.sarif
+          path: results.sarif
 
   shell-tests:
     name: Shell-скрипты (синтаксис + юнит-тесты)
