@@ -6,7 +6,10 @@ import { PrismaClient } from '@prisma/client';
  * вместо создания новых клиентов — иначе каждый модуль открывал бы свой пул соединений.
  */
 @Injectable()
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+export class PrismaService
+  extends PrismaClient
+  implements OnModuleInit, OnModuleDestroy
+{
   async onModuleInit() {
     await this.$connect();
   }

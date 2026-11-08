@@ -7,12 +7,13 @@ export class ReportsService {
 
   /** Общая статистика по всем кампаниям (для главной панели). */
   async overview() {
-    const [totalCampaigns, totalEmployees, totalGroups, eventCounts] = await Promise.all([
-      this.prisma.campaign.count(),
-      this.prisma.employee.count({ where: { isActive: true } }),
-      this.prisma.group.count(),
-      this.prisma.campaignEvent.groupBy({ by: ['type'], _count: true }),
-    ]);
+    const [totalCampaigns, totalEmployees, totalGroups, eventCounts] =
+      await Promise.all([
+        this.prisma.campaign.count(),
+        this.prisma.employee.count({ where: { isActive: true } }),
+        this.prisma.group.count(),
+        this.prisma.campaignEvent.groupBy({ by: ['type'], _count: true }),
+      ]);
     const byType: Record<string, number> = {};
     for (const row of eventCounts) byType[row.type] = row._count;
 
@@ -41,7 +42,15 @@ export class ReportsService {
 
     const byEmployee = new Map<
       string,
-      { employeeId: string; email: string; fullName: string; campaignsReceived: number; opened: number; clicked: number; submitted: number }
+      {
+        employeeId: string;
+        email: string;
+        fullName: string;
+        campaignsReceived: number;
+        opened: number;
+        clicked: number;
+        submitted: number;
+      }
     >();
 
     for (const target of targets) {
@@ -74,7 +83,9 @@ export class ReportsService {
         members: {
           include: {
             employee: {
-              include: { targets: { include: { events: { select: { type: true } } } } },
+              include: {
+                targets: { include: { events: { select: { type: true } } } },
+              },
             },
           },
         },
@@ -87,7 +98,8 @@ export class ReportsService {
       for (const member of group.members) {
         for (const target of member.employee.targets) {
           totalTargets++;
-          if (target.events.some((e) => e.type === 'FORM_SUBMITTED')) submitted++;
+          if (target.events.some((e) => e.type === 'FORM_SUBMITTED'))
+            submitted++;
         }
       }
       return {
@@ -96,7 +108,8 @@ export class ReportsService {
         memberCount: group.members.length,
         totalTargets,
         submitted,
-        submissionRate: totalTargets > 0 ? Math.round((submitted / totalTargets) * 100) : 0,
+        submissionRate:
+          totalTargets > 0 ? Math.round((submitted / totalTargets) * 100) : 0,
       };
     });
   }
@@ -109,10 +122,25 @@ export class ReportsService {
       select: { type: true, createdAt: true },
     });
 
-    const byDay = new Map<string, { date: string; sent: number; opened: number; clicked: number; submitted: number }>();
+    const byDay = new Map<
+      string,
+      {
+        date: string;
+        sent: number;
+        opened: number;
+        clicked: number;
+        submitted: number;
+      }
+    >();
     for (const ev of events) {
       const day = ev.createdAt.toISOString().slice(0, 10);
-      const entry = byDay.get(day) ?? { date: day, sent: 0, opened: 0, clicked: 0, submitted: 0 };
+      const entry = byDay.get(day) ?? {
+        date: day,
+        sent: 0,
+        opened: 0,
+        clicked: 0,
+        submitted: 0,
+      };
       if (ev.type === 'EMAIL_SENT') entry.sent++;
       if (ev.type === 'EMAIL_OPENED') entry.opened++;
       if (ev.type === 'LINK_CLICKED') entry.clicked++;
@@ -125,7 +153,10 @@ export class ReportsService {
   /** Сравнение кампаний по ключевым метрикам. */
   async compareCampaigns() {
     const campaigns = await this.prisma.campaign.findMany({
-      include: { _count: { select: { targets: true } }, events: { select: { type: true } } },
+      include: {
+        _count: { select: { targets: true } },
+        events: { select: { type: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
     return campaigns.map((c) => {
@@ -142,7 +173,10 @@ export class ReportsService {
         status: c.status,
         totalTargets: c._count.targets,
         ...counts,
-        submissionRate: c._count.targets > 0 ? Math.round((counts.submitted / c._count.targets) * 100) : 0,
+        submissionRate:
+          c._count.targets > 0
+            ? Math.round((counts.submitted / c._count.targets) * 100)
+            : 0,
       };
     });
   }
@@ -159,7 +193,12 @@ export class ReportsService {
     const rows = events
       .map((e) => {
         const email = e.target.employee?.email ?? '';
-        return [csvEscape(email), e.type, e.isSuspiciousAutomated, e.createdAt.toISOString()].join(',');
+        return [
+          csvEscape(email),
+          e.type,
+          e.isSuspiciousAutomated,
+          e.createdAt.toISOString(),
+        ].join(',');
       })
       .join('\n');
     return header + rows;

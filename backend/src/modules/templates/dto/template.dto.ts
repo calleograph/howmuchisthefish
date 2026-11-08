@@ -17,7 +17,8 @@ export class CreateTemplateDto {
   mjmlSource!: string;
 
   @ApiPropertyOptional({
-    description: 'Список переменных персонализации, например ["firstName", "lastName"]',
+    description:
+      'Список переменных персонализации, например ["firstName", "lastName"]',
     type: [String],
   })
   @IsOptional()
@@ -53,7 +54,8 @@ export class UpdateTemplateDto {
 
 export class PreviewTemplateDto {
   @ApiPropertyOptional({
-    description: 'Значения переменных для предпросмотра, например {"firstName": "Иван"}',
+    description:
+      'Значения переменных для предпросмотра, например {"firstName": "Иван"}',
   })
   @IsOptional()
   sampleData?: Record<string, string>;

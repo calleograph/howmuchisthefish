@@ -38,7 +38,10 @@ export class ReportsController {
   @Header('Content-Type', 'text/csv; charset=utf-8')
   async exportCampaign(@Param('id') id: string, @Res() res: Response) {
     const csv = await this.reports.exportCampaignEventsCsv(id);
-    res.set('Content-Disposition', `attachment; filename="campaign-${id}-events.csv"`);
+    res.set(
+      'Content-Disposition',
+      `attachment; filename="campaign-${id}-events.csv"`,
+    );
     res.send(csv);
   }
 }

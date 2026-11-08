@@ -21,7 +21,9 @@ const KNOWN_SCANNER_UA_PATTERNS = [
   /^$/, // отсутствующий User-Agent — тоже подозрительно для перехода человеком
 ];
 
-export function isLikelyAutomatedScanner(userAgent: string | null | undefined): boolean {
+export function isLikelyAutomatedScanner(
+  userAgent: string | null | undefined,
+): boolean {
   const ua = userAgent ?? '';
   return KNOWN_SCANNER_UA_PATTERNS.some((pattern) => pattern.test(ua));
 }

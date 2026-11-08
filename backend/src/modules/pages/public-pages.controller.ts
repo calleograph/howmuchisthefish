@@ -24,20 +24,32 @@ export class PublicPagesController {
   @Get(':slug')
   @Header('Cache-Control', 'no-store')
   @Header('X-Frame-Options', 'DENY')
-  @Header('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; form-action 'self'")
-  async serve(@Param('slug') slug: string, @Query('token') token: string | undefined, @Res() res: Response) {
+  @Header(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; form-action 'self'",
+  )
+  async serve(
+    @Param('slug') slug: string,
+    @Query('token') token: string | undefined,
+    @Res() res: Response,
+  ) {
     const page = await this.pages.getBySlug(slug);
 
     let html = page.htmlSource;
     if (token) {
       // Токен должен существовать — иначе произвольный/угаданный токен не должен
       // давать возможность регистрировать события под видом реальной цели кампании.
-      const target = await this.events.ensureTargetExists(token).catch(() => null);
+      const target = await this.events
+        .ensureTargetExists(token)
+        .catch(() => null);
       if (target) {
         // Скрипт всегда шлёт link_clicked при загрузке; слушатель submit вешается
         // независимо от formEnabled — лишний обработчик без формы на странице не
         // сработает, но так проще, чем условно генерировать разный JS.
-        const script = buildSafeFormScript(token, this.config.get<string>('PUBLIC_BASE_URL', ''));
+        const script = buildSafeFormScript(
+          token,
+          this.config.get<string>('PUBLIC_BASE_URL', ''),
+        );
         html = injectBeforeBodyEnd(html, script);
       }
     }
@@ -52,5 +64,7 @@ export class PublicPagesController {
 function injectBeforeBodyEnd(html: string, snippet: string): string {
   const closingBodyIndex = html.toLowerCase().lastIndexOf('</body>');
   if (closingBodyIndex === -1) return html + snippet;
-  return html.slice(0, closingBodyIndex) + snippet + html.slice(closingBodyIndex);
+  return (
+    html.slice(0, closingBodyIndex) + snippet + html.slice(closingBodyIndex)
+  );
 }

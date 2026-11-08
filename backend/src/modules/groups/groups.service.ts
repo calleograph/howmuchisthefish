@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateGroupDto, UpdateGroupDto } from './dto/group.dto';
 
@@ -20,8 +24,11 @@ export class GroupsService {
   }
 
   async create(dto: CreateGroupDto) {
-    const existing = await this.prisma.group.findUnique({ where: { name: dto.name } });
-    if (existing) throw new ConflictException('Группа с таким именем уже существует');
+    const existing = await this.prisma.group.findUnique({
+      where: { name: dto.name },
+    });
+    if (existing)
+      throw new ConflictException('Группа с таким именем уже существует');
     return this.prisma.group.create({ data: dto });
   }
 

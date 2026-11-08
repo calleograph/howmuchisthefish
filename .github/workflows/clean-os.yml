@@ -1,0 +1,45 @@
+name: Установка на чистой ОС
+
+# Отдельный workflow (не часть основного CI) — проверяет, что install.sh
+# реально работает на чистых базовых образах Ubuntu/Debian без заранее
+# установленного Docker/прочих зависимостей. Запускается реже основного CI
+# (на PR в main и по расписанию), т.к. это самый долгий и ресурсоёмкий джоб.
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 4 * * 1" # еженедельно по понедельникам
+  workflow_dispatch:
+
+jobs:
+  clean-install:
+    name: install.sh на ${{ matrix.image }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - ubuntu:22.04
+          - ubuntu:24.04
+          - debian:12
+          - debian:13
+    container:
+      image: ${{ matrix.image }}
+      options: --privileged
+    steps:
+      - name: Установить git (обычно отсутствует в минимальных образах)
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq git sudo
+      - uses: actions/checkout@v4
+      - name: Создать непривилегированного пользователя для sudo-шагов install.sh
+        run: |
+          useradd -m -s /bin/bash installer
+          echo "installer ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+          chown -R installer:installer "$GITHUB_WORKSPACE"
+      - name: preflight.sh определяет ОС корректно
+        run: su installer -c "bash scripts/preflight.sh 2>&1 || true" # .env ещё не создан — ожидаемо падает на этом шаге, проверяем только определение ОС
+      - name: install.sh устанавливает зависимости (этап prerequisites)
+        run: su installer -c "bash scripts/install.sh --from prerequisites --dry-run"
+      - name: Повторный запуск безопасен (идемпотентность)
+        run: su installer -c "bash scripts/install.sh --from prerequisites --dry-run"

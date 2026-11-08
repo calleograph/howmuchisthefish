@@ -18,7 +18,10 @@ export class AuthService {
     private readonly jwt: JwtService,
   ) {}
 
-  async validateLocalUser(email: string, password: string): Promise<AuthenticatedUser> {
+  async validateLocalUser(
+    email: string,
+    password: string,
+  ): Promise<AuthenticatedUser> {
     const user = await this.prisma.user.findUnique({ where: { email } });
     // Единое сообщение независимо от того, не найден пользователь или не совпал пароль —
     // чтобы ответ не раскрывал, какие email зарегистрированы в системе.

@@ -1,5 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsEmail, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsEmail,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 export class CreateSmtpConfigDto {
   @ApiProperty()
@@ -18,7 +27,9 @@ export class CreateSmtpConfigDto {
   @Max(65535)
   port!: number;
 
-  @ApiPropertyOptional({ description: 'TLS/STARTTLS включён (по умолчанию true)' })
+  @ApiPropertyOptional({
+    description: 'TLS/STARTTLS включён (по умолчанию true)',
+  })
   @IsOptional()
   @IsBoolean()
   secure?: boolean;
@@ -76,7 +87,9 @@ export class UpdateSmtpConfigDto {
   @MaxLength(255)
   username?: string;
 
-  @ApiPropertyOptional({ description: 'Оставьте пустым, чтобы не менять сохранённый пароль' })
+  @ApiPropertyOptional({
+    description: 'Оставьте пустым, чтобы не менять сохранённый пароль',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(500)

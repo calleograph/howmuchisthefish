@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreatePageDto, UpdatePageDto } from './dto/page.dto';
 
@@ -21,13 +25,17 @@ export class PagesService {
 
   async getBySlug(slug: string) {
     const page = await this.prisma.landingPage.findUnique({ where: { slug } });
-    if (!page || page.isArchived) throw new NotFoundException('Страница не найдена');
+    if (!page || page.isArchived)
+      throw new NotFoundException('Страница не найдена');
     return page;
   }
 
   async create(dto: CreatePageDto) {
-    const existing = await this.prisma.landingPage.findUnique({ where: { slug: dto.slug } });
-    if (existing) throw new ConflictException('Страница с таким адресом уже существует');
+    const existing = await this.prisma.landingPage.findUnique({
+      where: { slug: dto.slug },
+    });
+    if (existing)
+      throw new ConflictException('Страница с таким адресом уже существует');
     return this.prisma.landingPage.create({
       data: {
         name: dto.name,
@@ -63,6 +71,9 @@ export class PagesService {
 
   async archive(id: string) {
     await this.get(id);
-    return this.prisma.landingPage.update({ where: { id }, data: { isArchived: true } });
+    return this.prisma.landingPage.update({
+      where: { id },
+      data: { isArchived: true },
+    });
   }
 }

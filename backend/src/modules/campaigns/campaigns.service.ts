@@ -1,7 +1,18 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { assertTransitionAllowed, CampaignStatus } from './campaign-state-machine';
-import { CreateCampaignDto, UpdateCampaignDto, BulkTargetsDto } from './dto/campaign.dto';
+import {
+  assertTransitionAllowed,
+  CampaignStatus,
+} from './campaign-state-machine';
+import {
+  CreateCampaignDto,
+  UpdateCampaignDto,
+  BulkTargetsDto,
+} from './dto/campaign.dto';
 import { MailerQueueService } from '../mailer/mailer-queue.service';
 
 @Injectable()
@@ -28,7 +39,10 @@ export class CampaignsService {
     // должен уходить клиенту через API кампании (единственная авторизованная точка
     // получения статуса пароля — SmtpConfigService, который возвращает hasPassword).
     const { passwordEnc, ...smtpConfigSafe } = campaign.smtpConfig;
-    return { ...campaign, smtpConfig: { ...smtpConfigSafe, hasPassword: !!passwordEnc } };
+    return {
+      ...campaign,
+      smtpConfig: { ...smtpConfigSafe, hasPassword: !!passwordEnc },
+    };
   }
 
   async create(dto: CreateCampaignDto) {
@@ -50,7 +64,10 @@ export class CampaignsService {
     });
 
     if (dto.employeeIds?.length || dto.groupIds?.length) {
-      await this.addTargets(campaign.id, { employeeIds: dto.employeeIds, groupIds: dto.groupIds });
+      await this.addTargets(campaign.id, {
+        employeeIds: dto.employeeIds,
+        groupIds: dto.groupIds,
+      });
     }
     return this.get(campaign.id);
   }
@@ -58,7 +75,9 @@ export class CampaignsService {
   async update(id: string, dto: UpdateCampaignDto) {
     const campaign = await this.get(id);
     if (campaign.status !== 'DRAFT') {
-      throw new BadRequestException('Изменять можно только кампанию в статусе DRAFT');
+      throw new BadRequestException(
+        'Изменять можно только кампанию в статусе DRAFT',
+      );
     }
     if (dto.templateId) await this.assertTemplateExists(dto.templateId);
     if (dto.pageId) await this.assertPageExists(dto.pageId);
@@ -76,8 +95,13 @@ export class CampaignsService {
     });
 
     if (dto.employeeIds || dto.groupIds) {
-      await this.prisma.campaignTarget.deleteMany({ where: { campaignId: id } });
-      await this.addTargets(id, { employeeIds: dto.employeeIds, groupIds: dto.groupIds });
+      await this.prisma.campaignTarget.deleteMany({
+        where: { campaignId: id },
+      });
+      await this.addTargets(id, {
+        employeeIds: dto.employeeIds,
+        groupIds: dto.groupIds,
+      });
     }
     return this.get(id);
   }
@@ -101,7 +125,11 @@ export class CampaignsService {
     });
 
     const filtered = allowedDomains?.length
-      ? employees.filter((e) => allowedDomains.some((d) => e.email.toLowerCase().endsWith(`@${d.toLowerCase()}`)))
+      ? employees.filter((e) =>
+          allowedDomains.some((d) =>
+            e.email.toLowerCase().endsWith(`@${d.toLowerCase()}`),
+          ),
+        )
       : employees;
 
     const skippedByDomain = employees.length - filtered.length;
@@ -151,13 +179,19 @@ export class CampaignsService {
   async pause(id: string) {
     const campaign = await this.get(id);
     assertTransitionAllowed(campaign.status as CampaignStatus, 'PAUSED');
-    return this.prisma.campaign.update({ where: { id }, data: { status: 'PAUSED' } });
+    return this.prisma.campaign.update({
+      where: { id },
+      data: { status: 'PAUSED' },
+    });
   }
 
   async resume(id: string) {
     const campaign = await this.get(id);
     assertTransitionAllowed(campaign.status as CampaignStatus, 'RUNNING');
-    return this.prisma.campaign.update({ where: { id }, data: { status: 'RUNNING' } });
+    return this.prisma.campaign.update({
+      where: { id },
+      data: { status: 'RUNNING' },
+    });
   }
 
   async finish(id: string) {
@@ -172,10 +206,18 @@ export class CampaignsService {
   async stats(id: string) {
     await this.get(id);
     const [sent, opened, clicked, submitted, total] = await Promise.all([
-      this.prisma.campaignEvent.count({ where: { campaignId: id, type: 'EMAIL_SENT' } }),
-      this.prisma.campaignEvent.count({ where: { campaignId: id, type: 'EMAIL_OPENED' } }),
-      this.prisma.campaignEvent.count({ where: { campaignId: id, type: 'LINK_CLICKED' } }),
-      this.prisma.campaignEvent.count({ where: { campaignId: id, type: 'FORM_SUBMITTED' } }),
+      this.prisma.campaignEvent.count({
+        where: { campaignId: id, type: 'EMAIL_SENT' },
+      }),
+      this.prisma.campaignEvent.count({
+        where: { campaignId: id, type: 'EMAIL_OPENED' },
+      }),
+      this.prisma.campaignEvent.count({
+        where: { campaignId: id, type: 'LINK_CLICKED' },
+      }),
+      this.prisma.campaignEvent.count({
+        where: { campaignId: id, type: 'FORM_SUBMITTED' },
+      }),
       this.prisma.campaignTarget.count({ where: { campaignId: id } }),
     ]);
     return { totalTargets: total, sent, opened, clicked, submitted };

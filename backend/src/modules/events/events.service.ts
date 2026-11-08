@@ -2,9 +2,13 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { isLikelyAutomatedScanner } from './bot-detection';
 
-export type TrackableEventType = 'email_sent' | 'email_opened' | 'link_clicked' | 'form_submitted';
+export type TrackableEventType =
+  'email_sent' | 'email_opened' | 'link_clicked' | 'form_submitted';
 
-const TYPE_MAP: Record<TrackableEventType, 'EMAIL_SENT' | 'EMAIL_OPENED' | 'LINK_CLICKED' | 'FORM_SUBMITTED'> = {
+const TYPE_MAP: Record<
+  TrackableEventType,
+  'EMAIL_SENT' | 'EMAIL_OPENED' | 'LINK_CLICKED' | 'FORM_SUBMITTED'
+> = {
   email_sent: 'EMAIL_SENT',
   email_opened: 'EMAIL_OPENED',
   link_clicked: 'LINK_CLICKED',
@@ -64,7 +68,9 @@ export class EventsService {
   }
 
   async ensureTargetExists(token: string) {
-    const target = await this.prisma.campaignTarget.findUnique({ where: { trackingToken: token } });
+    const target = await this.prisma.campaignTarget.findUnique({
+      where: { trackingToken: token },
+    });
     if (!target) throw new NotFoundException();
     return target;
   }

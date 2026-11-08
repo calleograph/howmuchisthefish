@@ -1,6 +1,11 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  randomBytes,
+} from 'crypto';
 
 const ALGO = 'aes-256-gcm';
 const IV_LENGTH = 12;
@@ -25,14 +30,16 @@ export class CryptoService implements OnModuleInit {
     }
     // Ключ может быть любой строкой — приводим к 32 байтам детерминированным образом (sha256),
     // чтобы не требовать от администратора руками подгонять длину hex-строки.
-    const { createHash } = require('crypto');
     this.key = createHash('sha256').update(raw).digest();
   }
 
   encrypt(plainText: string): string {
     const iv = randomBytes(IV_LENGTH);
     const cipher = createCipheriv(ALGO, this.key, iv);
-    const encrypted = Buffer.concat([cipher.update(plainText, 'utf8'), cipher.final()]);
+    const encrypted = Buffer.concat([
+      cipher.update(plainText, 'utf8'),
+      cipher.final(),
+    ]);
     const authTag = cipher.getAuthTag();
     // формат: base64(iv).base64(authTag).base64(ciphertext)
     return [iv, authTag, encrypted].map((b) => b.toString('base64')).join('.');
@@ -43,7 +50,11 @@ export class CryptoService implements OnModuleInit {
     if (!ivB64 || !tagB64 || !dataB64) {
       throw new Error('Некорректный формат зашифрованного значения');
     }
-    const decipher = createDecipheriv(ALGO, this.key, Buffer.from(ivB64, 'base64'));
+    const decipher = createDecipheriv(
+      ALGO,
+      this.key,
+      Buffer.from(ivB64, 'base64'),
+    );
     decipher.setAuthTag(Buffer.from(tagB64, 'base64'));
     const decrypted = Buffer.concat([
       decipher.update(Buffer.from(dataB64, 'base64')),

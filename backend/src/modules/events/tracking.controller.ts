@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Header, Post, Query, Req, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  Post,
+  Query,
+  Req,
+  Res,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { Public } from '../auth/public.decorator';
@@ -18,7 +27,11 @@ export class TrackingController {
   // Трекинг-пиксель открытия письма: <img src=".../t/pixel.gif?token=...">
   @Get('pixel.gif')
   @Header('Cache-Control', 'no-store')
-  async pixel(@Query('token') token: string, @Req() req: Request, @Res() res: Response) {
+  async pixel(
+    @Query('token') token: string,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
     if (token) {
       await this.events.record({
         token,

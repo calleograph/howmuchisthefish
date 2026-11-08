@@ -30,19 +30,38 @@ export class CsvImportService {
    * строка — заголовки. Невалидные строки не прерывают импорт целиком — собираются
    * в errors и возвращаются администратору.
    */
-  async importFromBuffer(buffer: Buffer, actorUserId: string | null): Promise<CsvImportResult> {
-    const result: CsvImportResult = { totalRows: 0, created: 0, updated: 0, skipped: 0, errors: [] };
+  async importFromBuffer(
+    buffer: Buffer,
+    actorUserId: string | null,
+  ): Promise<CsvImportResult> {
+    const result: CsvImportResult = {
+      totalRows: 0,
+      created: 0,
+      updated: 0,
+      skipped: 0,
+      errors: [],
+    };
 
     let records: Record<string, string>[];
     try {
-      records = parse(buffer, { columns: true, skip_empty_lines: true, trim: true });
+      records = parse(buffer, {
+        columns: true,
+        skip_empty_lines: true,
+        trim: true,
+      });
     } catch (e: any) {
-      result.errors.push({ row: 0, reason: `Не удалось разобрать CSV: ${e.message}` });
+      result.errors.push({
+        row: 0,
+        reason: `Не удалось разобрать CSV: ${e.message}`,
+      });
       return result;
     }
 
     if (records.length === 0) {
-      result.errors.push({ row: 0, reason: 'Файл пуст или не содержит строк данных' });
+      result.errors.push({
+        row: 0,
+        reason: 'Файл пуст или не содержит строк данных',
+      });
       return result;
     }
     if (records.length > MAX_ROWS) {
@@ -72,17 +91,29 @@ export class CsvImportService {
       const email = row.email?.trim().toLowerCase();
 
       if (!email || !EMAIL_RE.test(email)) {
-        result.errors.push({ row: rowNum, email, reason: 'Некорректный или пустой email' });
+        result.errors.push({
+          row: rowNum,
+          email,
+          reason: 'Некорректный или пустой email',
+        });
         result.skipped++;
         continue;
       }
       if (seenEmails.has(email)) {
-        result.errors.push({ row: rowNum, email, reason: 'Дублирующийся email в самом файле' });
+        result.errors.push({
+          row: rowNum,
+          email,
+          reason: 'Дублирующийся email в самом файле',
+        });
         result.skipped++;
         continue;
       }
       if (!row.firstName?.trim() || !row.lastName?.trim()) {
-        result.errors.push({ row: rowNum, email, reason: 'Пустое имя или фамилия' });
+        result.errors.push({
+          row: rowNum,
+          email,
+          reason: 'Пустое имя или фамилия',
+        });
         result.skipped++;
         continue;
       }
@@ -96,7 +127,9 @@ export class CsvImportService {
         position: row.position?.trim() || null,
       };
 
-      const existing = await this.prisma.employee.findUnique({ where: { email } });
+      const existing = await this.prisma.employee.findUnique({
+        where: { email },
+      });
       if (existing) {
         await this.prisma.employee.update({ where: { email }, data });
         await this.prisma.employeeHistory.create({

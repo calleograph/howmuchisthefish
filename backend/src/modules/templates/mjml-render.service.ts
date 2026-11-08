@@ -1,11 +1,14 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 // пакет `mjml` (v5) экспортирует асинхронную функцию через module.exports (export =),
 // без esModuleInterop в tsconfig — require, а не default import.
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const mjml2html = require('mjml') as (
   input: string,
   options?: { validationLevel?: 'strict' | 'soft' | 'skip'; minify?: boolean },
-) => Promise<{ html: string; errors: Array<{ formattedMessage?: string; message: string }> }>;
+) => Promise<{
+  html: string;
+  errors: Array<{ formattedMessage?: string; message: string }>;
+}>;
 
 export interface RenderResult {
   html: string;
@@ -37,7 +40,10 @@ export class MjmlRenderService {
     return [...found];
   }
 
-  async renderWithData(mjmlSource: string, data: Record<string, string>): Promise<RenderResult> {
+  async renderWithData(
+    mjmlSource: string,
+    data: Record<string, string>,
+  ): Promise<RenderResult> {
     const substituted = mjmlSource.replace(VARIABLE_RE, (_, key) => {
       const value = data[key];
       return value !== undefined ? escapeHtml(value) : `{{${key}}}`;
@@ -48,7 +54,9 @@ export class MjmlRenderService {
   async compileOrThrow(mjmlSource: string): Promise<string> {
     const { html, errors } = await this.compile(mjmlSource);
     if (errors.length > 0) {
-      throw new BadRequestException(`Ошибки компиляции MJML: ${errors.join('; ')}`);
+      throw new BadRequestException(
+        `Ошибки компиляции MJML: ${errors.join('; ')}`,
+      );
     }
     return html;
   }

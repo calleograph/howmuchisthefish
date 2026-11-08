@@ -1,0 +1,91 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+jobs:
+  # Публикация релиза ждёт зелёный CI именно для этого коммита — отдельный
+  # шаг, развязанный от самой публикации тега (урок из практики «Переговорки»:
+  # был случай, когда страница релиза зеленела при не собирающемся образе,
+  # потому что CI и Release были не связаны проверкой).
+  ci-gate:
+    name: Дождаться зелёного CI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ждать завершения CI для этого коммита (до 30 минут)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          sha="${{ github.sha }}"
+          for _ in $(seq 1 60); do
+            status=$(gh api "repos/${{ github.repository }}/commits/$sha/check-runs" \
+              --jq '[.check_runs[] | select(.name != "Дождаться зелёного CI")] | if any(.status != "completed") then "pending" elif any(.conclusion != "success") then "failed" else "success" end')
+            echo "Статус CI: $status"
+            if [ "$status" = "success" ]; then exit 0; fi
+            if [ "$status" = "failed" ]; then echo "::error::CI для этого коммита не прошёл"; exit 1; fi
+            sleep 30
+          done
+          echo "::error::Истекло время ожидания CI"
+          exit 1
+
+  build-and-push:
+    name: Сборка и публикация образов в GHCR
+    needs: ci-gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Версия из тега
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+      - name: Проверить, что VERSION в репозитории совпадает с тегом
+        run: |
+          repo_version=$(cat VERSION)
+          if [ "$repo_version" != "${{ steps.version.outputs.version }}" ]; then
+            echo "::error::VERSION ($repo_version) не совпадает с тегом (${{ steps.version.outputs.version }})"
+            exit 1
+          fi
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v3
+      - name: Собрать и опубликовать backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}-backend:${{ steps.version.outputs.version }}
+            ghcr.io/${{ github.repository }}-backend:latest
+      - name: Собрать и опубликовать frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}-frontend:${{ steps.version.outputs.version }}
+            ghcr.io/${{ github.repository }}-frontend:latest
+
+  github-release:
+    name: Создать GitHub Release
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Извлечь раздел CHANGELOG для этой версии
+        id: changelog
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk "/## \[$version\]/{flag=1; next} /## \[/{flag=0} flag" CHANGELOG.md > release_notes.md
+      - uses: softprops/action-gh-release@v2
+        with:
+          body_path: release_notes.md
+          generate_release_notes: true

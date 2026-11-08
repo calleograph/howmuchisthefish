@@ -18,14 +18,17 @@ export class TemplatesService {
   }
 
   async get(id: string) {
-    const template = await this.prisma.mailTemplate.findUnique({ where: { id } });
+    const template = await this.prisma.mailTemplate.findUnique({
+      where: { id },
+    });
     if (!template) throw new NotFoundException('Шаблон не найден');
     return template;
   }
 
   async create(dto: CreateTemplateDto) {
     const htmlCache = await this.mjml.compileOrThrow(dto.mjmlSource);
-    const variables = dto.variables ?? this.mjml.extractVariables(dto.mjmlSource);
+    const variables =
+      dto.variables ?? this.mjml.extractVariables(dto.mjmlSource);
     return this.prisma.mailTemplate.create({
       data: {
         name: dto.name,
@@ -40,8 +43,12 @@ export class TemplatesService {
   async update(id: string, dto: UpdateTemplateDto) {
     const existing = await this.get(id);
     const mjmlSource = dto.mjmlSource ?? existing.mjmlSource;
-    const htmlCache = dto.mjmlSource ? await this.mjml.compileOrThrow(mjmlSource) : existing.htmlCache;
-    const variables = dto.variables ?? (dto.mjmlSource ? this.mjml.extractVariables(mjmlSource) : undefined);
+    const htmlCache = dto.mjmlSource
+      ? await this.mjml.compileOrThrow(mjmlSource)
+      : existing.htmlCache;
+    const variables =
+      dto.variables ??
+      (dto.mjmlSource ? this.mjml.extractVariables(mjmlSource) : undefined);
 
     return this.prisma.mailTemplate.update({
       where: { id },
@@ -70,7 +77,10 @@ export class TemplatesService {
 
   async archive(id: string) {
     await this.get(id);
-    return this.prisma.mailTemplate.update({ where: { id }, data: { isArchived: true } });
+    return this.prisma.mailTemplate.update({
+      where: { id },
+      data: { isArchived: true },
+    });
   }
 
   async preview(id: string, sampleData: Record<string, string> = {}) {

@@ -16,12 +16,17 @@
  * ссылке из письма — он identifies цель кампании, но сам не является ПДн и не
  * раскрывает, кто ввёл какие данные в форму.
  */
-export function buildSafeFormScript(trackingToken: string, publicBaseUrl: string): string {
+export function buildSafeFormScript(
+  trackingToken: string,
+  publicBaseUrl: string,
+): string {
   // JSON.stringify для безопасной вставки токена в JS-литерал (защита от инъекции
   // через token, хотя сам токен генерируется сервером как uuid и не контролируется
   // пользователем — защита "на всякий случай", дешёвая и не помешает).
   const tokenLiteral = JSON.stringify(trackingToken);
-  const eventsUrl = JSON.stringify(`${publicBaseUrl.replace(/\/$/, '')}/t/event`);
+  const eventsUrl = JSON.stringify(
+    `${publicBaseUrl.replace(/\/$/, '')}/t/event`,
+  );
 
   return `
 <script>

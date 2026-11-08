@@ -2,7 +2,10 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CryptoService } from '../crypto/crypto.service';
-import { CreateSmtpConfigDto, UpdateSmtpConfigDto } from './dto/smtp-config.dto';
+import {
+  CreateSmtpConfigDto,
+  UpdateSmtpConfigDto,
+} from './dto/smtp-config.dto';
 
 /** Пароль никогда не возвращается клиенту — ни в списке, ни при чтении одной записи. */
 function omitPassword<T extends { passwordEnc: string | null }>(config: T) {
@@ -18,7 +21,9 @@ export class SmtpConfigService {
   ) {}
 
   async list() {
-    const configs = await this.prisma.smtpConfig.findMany({ orderBy: { name: 'asc' } });
+    const configs = await this.prisma.smtpConfig.findMany({
+      orderBy: { name: 'asc' },
+    });
     return configs.map(omitPassword);
   }
 
@@ -61,7 +66,9 @@ export class SmtpConfigService {
         fromAddress: dto.fromAddress,
         isDefault: dto.isDefault,
         // Пароль меняется только если явно передан — пустое значение не стирает сохранённый.
-        ...(dto.password ? { passwordEnc: this.crypto.encrypt(dto.password) } : {}),
+        ...(dto.password
+          ? { passwordEnc: this.crypto.encrypt(dto.password) }
+          : {}),
       },
     });
     return omitPassword(updated);
@@ -80,7 +87,12 @@ export class SmtpConfigService {
       secure: config.port === 465, // неявный TLS только на 465; остальное — STARTTLS через requireTLS
       requireTLS: config.secure && config.port !== 465,
       auth: config.username
-        ? { user: config.username, pass: config.passwordEnc ? this.crypto.decrypt(config.passwordEnc) : '' }
+        ? {
+            user: config.username,
+            pass: config.passwordEnc
+              ? this.crypto.decrypt(config.passwordEnc)
+              : '',
+          }
         : undefined,
       // Отказ от самоподписанных сертификатов по умолчанию — ослаблять явно, не молча.
       tls: { rejectUnauthorized: true },

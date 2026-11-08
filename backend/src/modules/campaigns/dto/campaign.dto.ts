@@ -30,7 +30,10 @@ export class CreateCampaignDto {
   @IsUUID()
   smtpConfigId!: string;
 
-  @ApiPropertyOptional({ type: [String], description: 'ID сотрудников-получателей' })
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'ID сотрудников-получателей',
+  })
   @IsOptional()
   @IsArray()
   @IsUUID('4', { each: true })
@@ -49,7 +52,10 @@ export class CreateCampaignDto {
   @Max(1000)
   sendRateLimit?: number;
 
-  @ApiPropertyOptional({ type: [String], description: 'Если задано — получатели ограничены этими доменами' })
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Если задано — получатели ограничены этими доменами',
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })

@@ -9,7 +9,9 @@ import { IsIn, IsString, IsUUID } from 'class-validator';
  * вообще не читает значения полей.
  */
 export class TrackEventDto {
-  @ApiProperty({ description: 'trackingToken цели кампании (CampaignTarget.trackingToken)' })
+  @ApiProperty({
+    description: 'trackingToken цели кампании (CampaignTarget.trackingToken)',
+  })
   @IsString()
   @IsUUID()
   token!: string;

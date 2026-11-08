@@ -19,7 +19,10 @@ export class AuthController {
   async login(@Body() dto: LoginDto) {
     this.throttle.assertNotLocked(dto.email);
     try {
-      const user = await this.authService.validateLocalUser(dto.email, dto.password);
+      const user = await this.authService.validateLocalUser(
+        dto.email,
+        dto.password,
+      );
       this.throttle.recordSuccess(dto.email);
       return this.authService.issueToken(user);
     } catch (err) {

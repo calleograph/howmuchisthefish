@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PgBoss } from 'pg-boss';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -37,7 +42,9 @@ export class MailerQueueService implements OnModuleInit, OnModuleDestroy {
     // pg-boss v12: очередь не создаётся неявно при первом send/work — нужно явно.
     // createQueue идемпотентен (безопасно вызывать при каждом старте приложения).
     await this.boss.createQueue(QUEUE_NAME);
-    await this.boss.work<SendJobData>(QUEUE_NAME, async ([job]) => this.handleSend(job.data));
+    await this.boss.work<SendJobData>(QUEUE_NAME, async ([job]) =>
+      this.handleSend(job.data),
+    );
   }
 
   async onModuleDestroy() {
@@ -58,7 +65,9 @@ export class MailerQueueService implements OnModuleInit, OnModuleDestroy {
     let i = 0;
     for (const target of campaign.targets) {
       const jobData: SendJobData = { campaignId, targetId: target.id };
-      await this.boss.send(QUEUE_NAME, jobData, { startAfter: i * delaySeconds });
+      await this.boss.send(QUEUE_NAME, jobData, {
+        startAfter: i * delaySeconds,
+      });
       i++;
     }
     return { enqueued: campaign.targets.length };
@@ -67,26 +76,39 @@ export class MailerQueueService implements OnModuleInit, OnModuleDestroy {
   private async handleSend(data: SendJobData) {
     const target = await this.prisma.campaignTarget.findUnique({
       where: { id: data.targetId },
-      include: { employee: true, campaign: { include: { template: true, page: true } } },
+      include: {
+        employee: true,
+        campaign: { include: { template: true, page: true } },
+      },
     });
     if (!target || !target.employee) return;
 
     const { campaign } = target;
     try {
-      const transport = await this.smtp.getTransportForCampaign(campaign.smtpConfigId);
-      const { html } = await this.mjml.renderWithData(campaign.template.mjmlSource, {
-        firstName: target.employee.firstName,
-        lastName: target.employee.lastName,
-      });
+      const transport = await this.smtp.getTransportForCampaign(
+        campaign.smtpConfigId,
+      );
+      const { html } = await this.mjml.renderWithData(
+        campaign.template.mjmlSource,
+        {
+          firstName: target.employee.firstName,
+          lastName: target.employee.lastName,
+        },
+      );
       const smtpConfig = await this.smtp.get(campaign.smtpConfigId);
 
       // Ссылки на учебную страницу и пиксель открытия встраиваются с trackingToken цели.
-      const publicBaseUrl = this.config.get<string>('PUBLIC_BASE_URL', '').replace(/\/$/, '');
+      const publicBaseUrl = this.config
+        .get<string>('PUBLIC_BASE_URL', '')
+        .replace(/\/$/, '');
       const landingUrl = `${publicBaseUrl}/lp/${campaign.page.slug}?token=${target.trackingToken}`;
       const pixelUrl = `${publicBaseUrl}/t/pixel.gif?token=${target.trackingToken}`;
       const htmlWithTracking = html
         .replace(/\{\{landingPageUrl\}\}/g, landingUrl)
-        .replace('</body>', `<img src="${pixelUrl}" width="1" height="1" alt="" style="display:none" /></body>`);
+        .replace(
+          '</body>',
+          `<img src="${pixelUrl}" width="1" height="1" alt="" style="display:none" /></body>`,
+        );
 
       await transport.sendMail({
         from: smtpConfig.fromAddress,
@@ -96,10 +118,16 @@ export class MailerQueueService implements OnModuleInit, OnModuleDestroy {
       });
 
       await this.prisma.campaignEvent.create({
-        data: { campaignId: campaign.id, targetId: target.id, type: 'EMAIL_SENT' },
+        data: {
+          campaignId: campaign.id,
+          targetId: target.id,
+          type: 'EMAIL_SENT',
+        },
       });
     } catch (err: any) {
-      this.logger.error(`Не удалось отправить письмо цели ${target.id}: ${err.message}`);
+      this.logger.error(
+        `Не удалось отправить письмо цели ${target.id}: ${err.message}`,
+      );
       // shortcut: без повторных попыток отправки конкретного письма в 0.1.0 — сбой
       // просто не создаёт EMAIL_SENT, видно в отчёте как "не отправлено"; upgrade:
       // добавить retry с ограничением попыток, если доставка окажется нестабильной.

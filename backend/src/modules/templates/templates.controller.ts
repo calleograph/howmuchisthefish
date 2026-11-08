@@ -1,8 +1,20 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../auth/roles.decorator';
 import { TemplatesService } from './templates.service';
-import { CreateTemplateDto, PreviewTemplateDto, UpdateTemplateDto } from './dto/template.dto';
+import {
+  CreateTemplateDto,
+  PreviewTemplateDto,
+  UpdateTemplateDto,
+} from './dto/template.dto';
 
 @ApiTags('templates')
 @ApiBearerAuth()

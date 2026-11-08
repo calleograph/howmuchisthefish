@@ -37,7 +37,12 @@ export class EmployeesController {
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page = 1,
     @Query('pageSize', new DefaultValuePipe(25), ParseIntPipe) pageSize = 25,
   ) {
-    return this.employees.list({ search, groupId, page, pageSize: Math.min(pageSize, 200) });
+    return this.employees.list({
+      search,
+      groupId,
+      page,
+      pageSize: Math.min(pageSize, 200),
+    });
   }
 
   @Get(':id')
@@ -58,7 +63,11 @@ export class EmployeesController {
 
   @Roles('ADMIN', 'EDITOR')
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateEmployeeDto, @Request() req: any) {
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateEmployeeDto,
+    @Request() req: any,
+  ) {
     return this.employees.update(id, dto, req.user?.id ?? null);
   }
 
@@ -84,7 +93,13 @@ export class EmployeesController {
   @Post('import-csv')
   importCsv(@UploadedFile() file: Express.Multer.File, @Request() req: any) {
     if (!file) {
-      return { totalRows: 0, created: 0, updated: 0, skipped: 0, errors: [{ row: 0, reason: 'Файл не передан' }] };
+      return {
+        totalRows: 0,
+        created: 0,
+        updated: 0,
+        skipped: 0,
+        errors: [{ row: 0, reason: 'Файл не передан' }],
+      };
     }
     return this.csvImport.importFromBuffer(file.buffer, req.user?.id ?? null);
   }

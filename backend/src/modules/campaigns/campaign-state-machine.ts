@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 
-export type CampaignStatus = 'DRAFT' | 'SCHEDULED' | 'RUNNING' | 'PAUSED' | 'FINISHED' | 'FAILED';
+export type CampaignStatus =
+  'DRAFT' | 'SCHEDULED' | 'RUNNING' | 'PAUSED' | 'FINISHED' | 'FAILED';
 
 /**
  * Явный конечный автомат состояний кампании (задание §2.4). Переход, не описанный
@@ -16,7 +17,10 @@ const ALLOWED_TRANSITIONS: Record<CampaignStatus, CampaignStatus[]> = {
   FAILED: ['DRAFT'], // можно исправить настройки и перезапустить с нуля
 };
 
-export function assertTransitionAllowed(from: CampaignStatus, to: CampaignStatus) {
+export function assertTransitionAllowed(
+  from: CampaignStatus,
+  to: CampaignStatus,
+) {
   if (!ALLOWED_TRANSITIONS[from].includes(to)) {
     throw new BadRequestException(
       `Недопустимый переход кампании из состояния ${from} в ${to}`,

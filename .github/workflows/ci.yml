@@ -1,0 +1,166 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend (lint, typecheck, test, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run lint
+      - run: npx tsc --noEmit -p tsconfig.json
+      - run: npm run build
+      - name: Юнит-тесты (включая guard-тест config-registry против schema.prisma)
+        run: npm test
+
+  backend-migration-check:
+    name: Backend — проверка миграций на реальном PostgreSQL
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: sap
+          POSTGRES_PASSWORD: ci_test_password
+          POSTGRES_DB: sap
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U sap -d sap"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - name: Применить миграции на чистой БД
+        env:
+          DATABASE_URL: postgresql://sap:ci_test_password@localhost:5432/sap
+        run: npx prisma migrate deploy
+      - name: Повторное применение безопасно (идемпотентность)
+        env:
+          DATABASE_URL: postgresql://sap:ci_test_password@localhost:5432/sap
+        run: npx prisma migrate deploy
+
+  frontend:
+    name: Frontend (lint, typecheck, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+
+  docker-build:
+    name: Docker — реальная сборка образов
+    runs-on: ubuntu-latest
+    # Настоящая сборка образов, не только npm run build на хосте — в этом
+    # проекте уже был случай, когда локальный build проходил, а Dockerfile
+    # ссылался на несуществующий путь (dist/src/main.js вместо dist/main.js)
+    # и контейнер падал в restart loop. CI должен ловить это до релиза.
+    steps:
+      - uses: actions/checkout@v4
+      - name: Собрать backend
+        run: docker build -t sap-backend-ci:test ./backend
+      - name: Собрать frontend
+        run: docker build -t sap-frontend-ci:test ./frontend
+      - name: Самопроверка backend-образа — контейнер реально стартует
+        run: |
+          docker run -d --name backend-selfcheck \
+            -e DATABASE_URL=postgresql://nouser:nopass@localhost:5432/noop \
+            -e JWT_SECRET=ci-test-secret \
+            -e APP_MASTER_KEY=ci-test-master-key \
+            -e PUBLIC_BASE_URL=http://localhost \
+            sap-backend-ci:test
+          sleep 3
+          # Контейнер не обязан быть healthy (нет реальной БД в этом job),
+          # но не должен быть в состоянии restarting/exited с ошибкой модуля.
+          status=$(docker inspect -f '{{.State.Status}}' backend-selfcheck)
+          echo "Статус контейнера: $status"
+          if [ "$status" = "exited" ]; then
+            exit_code=$(docker inspect -f '{{.State.ExitCode}}' backend-selfcheck)
+            logs=$(docker logs backend-selfcheck 2>&1)
+            if echo "$logs" | grep -q "MODULE_NOT_FOUND"; then
+              echo "::error::Контейнер упал с MODULE_NOT_FOUND — неверный путь в CMD Dockerfile"
+              exit 1
+            fi
+          fi
+          docker rm -f backend-selfcheck
+
+  private-data-scan:
+    name: Сканер приватных данных (белый список)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Проверка на запрещённые паттерны (IP, внутренние домены, явные секреты)
+        run: bash scripts/ci/private_data_scan.sh
+
+  secret-scan:
+    name: Сканер секретов (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  shell-tests:
+    name: Shell-скрипты (синтаксис + юнит-тесты)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Синтаксическая проверка всех скриптов
+        run: |
+          set -e
+          for f in $(find scripts -name "*.sh"); do
+            echo "Проверка: $f"
+            bash -n "$f"
+          done
+      - name: Юнит-тесты
+        run: bash tests/scripts/test_prereqlib.sh
+
+  version-consistency:
+    name: Согласованность версии
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: VERSION соответствует CHANGELOG
+        run: |
+          version=$(cat VERSION)
+          if ! grep -q "\[$version\]" CHANGELOG.md; then
+            echo "::error::VERSION ($version) не упомянута в CHANGELOG.md"
+            exit 1
+          fi
+          echo "OK: $version найдена в CHANGELOG.md"
