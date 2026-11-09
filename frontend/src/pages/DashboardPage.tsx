@@ -191,9 +191,11 @@ function StatCard({
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-        {/* min-w-0 — без него flex-ребёнок не сжимается уже и длинный
-            заголовок выталкивает/обрезает себя об соседнюю иконку. */}
-        <CardTitle className="min-w-0 text-sm font-medium text-muted-foreground">{title}</CardTitle>
+        {/* min-w-0 — без него flex-ребёнок не сжимается уже контента и
+            выталкивает/наезжает на соседнюю иконку. break-words — "Скомпро-
+            метировано" длиннее доступной ширины и без пробелов внутри,
+            overflow-wrap:normal по умолчанию не переносит такое слово. */}
+        <CardTitle className="min-w-0 text-sm font-medium break-words text-muted-foreground">{title}</CardTitle>
         <Icon className={cn('shrink-0', iconClass)} />
       </CardHeader>
       <CardContent>
