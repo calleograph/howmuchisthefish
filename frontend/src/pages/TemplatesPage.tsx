@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Plus, Mail, Link2, Flag } from 'lucide-react'
 import { toast } from 'sonner'
+import { ReportButton } from '@/components/ReportButton'
 
 interface Template {
   id: string
@@ -82,7 +83,9 @@ export default function TemplatesPage() {
           <h1 className="text-2xl font-semibold">Почтовые шаблоны</h1>
           <p className="text-muted-foreground">Письма для учебных кампаний (формат MJML)</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <div className="flex gap-2">
+          <ReportButton type="templates" label="Отчёт по шаблонам" />
+          <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger
             render={
               <Button>
@@ -146,7 +149,8 @@ export default function TemplatesPage() {
               </Button>
             </div>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Server, CheckCircle2, XCircle, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { UpdateTab } from './settings/UpdateTab'
+import { ReportButton } from '@/components/ReportButton'
 
 interface SmtpConfig {
   id: string
@@ -85,7 +86,8 @@ export default function SettingsPage() {
         </TabsList>
 
         <TabsContent value="smtp" className="flex flex-col gap-4">
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            <ReportButton type="smtp" label="Отчёт по SMTP" />
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger
                 render={
@@ -195,8 +197,9 @@ function MaintenanceTab() {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between gap-2">
         <CardTitle className="text-base">Очистка старых записей журнала</CardTitle>
+        <ReportButton type="audit-log" label="Отчёт по журналу" />
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <p className="text-sm text-muted-foreground">

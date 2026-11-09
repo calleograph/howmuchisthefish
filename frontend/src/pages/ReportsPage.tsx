@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { ShieldCheck, X } from 'lucide-react'
+import { ReportButton } from '@/components/ReportButton'
 
 interface EmployeeRow {
   employeeId: string
@@ -68,6 +69,9 @@ export default function ReportsPage() {
         <div>
           <h1 className="text-2xl font-semibold">Аналитика</h1>
           <p className="text-muted-foreground">Срезы по сотрудникам и группам</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <ReportButton type="analytics" label="Отчёт по аналитике" />
         </div>
         {filter && (
           <div className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2 text-sm">

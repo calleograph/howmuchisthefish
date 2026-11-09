@@ -19,6 +19,7 @@ import { SmtpModule } from './modules/smtp/smtp.module';
 import { MailerModule } from './modules/mailer/mailer.module';
 import { CampaignsModule } from './modules/campaigns/campaigns.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { ReportJobsModule } from './modules/report-jobs/report-jobs.module';
 import { CustomFieldsModule } from './modules/custom-fields/custom-fields.module';
 import { MaintenanceModule } from './modules/admin/maintenance/maintenance.module';
 import { UpdateModule } from './modules/admin/update/update.module';
@@ -62,6 +63,7 @@ import { UpdateModule } from './modules/admin/update/update.module';
     MailerModule,
     CampaignsModule,
     ReportsModule,
+    ReportJobsModule,
     CustomFieldsModule,
     MaintenanceModule,
     UpdateModule,

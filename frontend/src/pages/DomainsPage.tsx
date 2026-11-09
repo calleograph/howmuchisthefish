@@ -15,6 +15,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Plus, Globe, RefreshCw, Trash2, Copy } from 'lucide-react'
 import { toast } from 'sonner'
+import { ReportButton } from '@/components/ReportButton'
 
 interface Domain {
   id: string
@@ -99,6 +100,8 @@ export default function DomainsPage() {
             )}
           </p>
         </div>
+        <div className="flex gap-2">
+          <ReportButton type="domains" label="Отчёт по доменам" />
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger
             render={
@@ -134,6 +137,7 @@ export default function DomainsPage() {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {isLoading ? (

@@ -375,3 +375,24 @@ model Backup {
 
   @@map("backups")
 }
+
+// Единый механизм отчётности (задание §9 — "кнопка Сформировать отчёт
+// учитывает текущие фильтры", "история сформированных отчётов"), один тип
+// на каждый из 10 разделов — см. ReportExportType в reports-export.service.ts.
+// Небольшие отчёты (один раздел, CSV) формируются синхронно (completedAt
+// выставляется сразу); крупные XLSX уходят в очередь pg-boss — тот же
+// принцип, что уже применяется для рассылки писем.
+model ReportJob {
+  id           String    @id @default(uuid())
+  type         String // @policy:data — employees | campaigns | campaign-detail | ...
+  format       String // @policy:data — csv | xlsx
+  filters      Json      @default("{}") // @policy:data — период/раздел-специфичные параметры
+  status       String    @default("pending") // pending | running | done | failed
+  filePath     String? // @policy:reset — путь в storage, сам файл не входит в бэкап конфигурации
+  errorMessage String? // @policy:data
+  requestedBy  String? // @policy:data — userId, null для системных задач
+  createdAt    DateTime  @default(now())
+  finishedAt   DateTime?
+
+  @@map("report_jobs")
+}

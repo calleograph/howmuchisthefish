@@ -15,6 +15,7 @@ import { Upload, Download, Search, Plus, UsersRound, Users, UserX } from 'lucide
 import { toast } from 'sonner'
 import { Link } from 'react-router-dom'
 import { CustomFieldsTab } from './employees/CustomFieldsTab'
+import { ReportButton } from '@/components/ReportButton'
 
 interface Employee {
   id: string
@@ -115,6 +116,7 @@ export default function EmployeesPage() {
             <Download className="size-4" />
             Экспорт CSV
           </Button>
+          <ReportButton type="employees" label="Отчёт" />
           <input ref={fileInput} type="file" accept=".csv" hidden onChange={handleFileChange} />
           <Button onClick={() => fileInput.current?.click()} disabled={importMutation.isPending}>
             <Upload className="size-4" />
@@ -297,7 +299,8 @@ function GroupsTab() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <ReportButton type="groups" label="Отчёт по группам" />
         <Dialog
           open={open}
           onOpenChange={(v) => {

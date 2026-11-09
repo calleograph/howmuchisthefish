@@ -58,6 +58,16 @@ export const CONFIG_REGISTRY: ConfigFieldEntry[] = [
   { model: 'EmployeeHistory', field: '*', policy: 'data' },
   { model: 'Setting', field: '*', policy: 'data' }, // политика по конкретному key — см. SETTINGS_POLICY ниже
   { model: 'Backup', field: '*', policy: 'data' }, // сама запись о бэкапе, не его содержимое
+
+  // ReportJob — filePath явно reset (сам файл отчёта не входит в бэкап
+  // конфигурации, только запись о факте генерации), остальные поля data.
+  { model: 'ReportJob', field: 'type', policy: 'data' },
+  { model: 'ReportJob', field: 'format', policy: 'data' },
+  { model: 'ReportJob', field: 'filters', policy: 'data' },
+  { model: 'ReportJob', field: 'status', policy: 'data' },
+  { model: 'ReportJob', field: 'filePath', policy: 'reset' },
+  { model: 'ReportJob', field: 'errorMessage', policy: 'data' },
+  { model: 'ReportJob', field: 'requestedBy', policy: 'data' },
   { model: 'CustomFieldDef', field: '*', policy: 'data' }, // схема доп. полей сотрудников — не их значения
 
   // CapturedCredential — зашифрован отдельным от APP_MASTER_KEY ключом

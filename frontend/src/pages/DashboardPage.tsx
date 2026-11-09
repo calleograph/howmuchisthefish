@@ -5,6 +5,7 @@ import { api } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ChartContainer, ChartTooltipContent, Recharts } from '@/components/ui/chart'
+import { ReportButton } from '@/components/ReportButton'
 import {
   Mail,
   MailOpen,
@@ -66,9 +67,12 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Обзор</h1>
-        <p className="text-muted-foreground">Сводная статистика по всем кампаниям</p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold">Обзор</h1>
+          <p className="text-muted-foreground">Сводная статистика по всем кампаниям</p>
+        </div>
+        <ReportButton type="overview" label="Отчёт по обзору" />
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

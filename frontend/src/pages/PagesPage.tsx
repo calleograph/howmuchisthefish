@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Plus, FileText, Globe, ShieldAlert } from 'lucide-react'
+import { ReportButton } from '@/components/ReportButton'
 
 interface LandingPage {
   id: string
@@ -33,10 +34,13 @@ export default function PagesPage() {
             Страницы, на которые ведут ссылки из писем. По умолчанию сохраняется только факт отправки формы.
           </p>
         </div>
-        <Button render={<Link to="/pages/new" />}>
-          <Plus className="size-4" />
-          Новая страница
-        </Button>
+        <div className="flex gap-2">
+          <ReportButton type="pages" label="Отчёт по страницам" />
+          <Button render={<Link to="/pages/new" />}>
+            <Plus className="size-4" />
+            Новая страница
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Plus, Play, Pause, Square } from 'lucide-react'
 import { toast } from 'sonner'
 import { Link } from 'react-router-dom'
+import { ReportButton } from '@/components/ReportButton'
 
 interface Campaign {
   id: string
@@ -57,10 +58,13 @@ export default function CampaignsPage() {
           <h1 className="text-2xl font-semibold">Кампании</h1>
           <p className="text-muted-foreground">Учебные фишинговые рассылки</p>
         </div>
-        <Button render={<Link to="/campaigns/new" />}>
-          <Plus className="size-4" />
-          Новая кампания
-        </Button>
+        <div className="flex gap-2">
+          <ReportButton type="campaigns" label="Отчёт по кампаниям" />
+          <Button render={<Link to="/campaigns/new" />}>
+            <Plus className="size-4" />
+            Новая кампания
+          </Button>
+        </div>
       </div>
 
       <Card className="overflow-visible">
