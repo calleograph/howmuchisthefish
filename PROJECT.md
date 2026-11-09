@@ -60,7 +60,7 @@ VERSION, CHANGELOG.md        — текущая версия и журнал р�
 
 ### Frontend-маршруты (frontend/src/App.tsx)
 
-`/login` (публичный) · `/` Dashboard · `/employees` (+`/:id` — детальная история) · `/templates` · `/pages` (+`/new`, `/:id/edit` — полноэкранный редактор) · `/domains` · `/campaigns` (+`/:id`) · `/reports` · `/settings` (вкладки SMTP / Обслуживание / Обновление)
+`/login` (публичный) · `/` Dashboard · `/employees` (+`/:id` — детальная история) · `/templates` · `/pages` (+`/new`, `/:id/edit` — полноэкранный редактор) · `/domains` · `/campaigns` (+`/new` — мастер создания, `/:id`) · `/reports` · `/settings` (вкладки SMTP / Обслуживание / Обновление)
 
 ## Технологии
 
@@ -92,6 +92,7 @@ VERSION, CHANGELOG.md        — текущая версия и журнал р�
 - Полноэкранный редактор учебной страницы (`/pages/new`, `/pages/:id/edit`) — заменил узкий 640px-диалог, живой iframe-предпросмотр (desktop/mobile) через `srcDoc` с `sandbox="allow-scripts"` без `allow-same-origin`
 - Граббер: локальное сохранение ресурсов (CSS/JS/картинки/шрифты) при клонировании — страница не зависит от доступности исходного сайта после сохранения. Проверено живым тестом на реальном клонировании en.wikipedia.org (не синтетическая тестовая страница) — see HISTORY.md
 - Почта: retry при сбое отправки (pg-boss `retryLimit=3` + `retryBackoff`, ошибка теперь пробрасывается дальше вместо тихого логирования), multi-SMTP failover на последней попытке retry (пробует остальные активные SMTP-подключения по порядку, `SmtpConfigService.listIdsExcept`), полная персонализация писем (firstName/lastName/department/position/customFields сотрудника)
+- Полноэкранный мастер создания кампании (`/campaigns/new`) — заменил узкий модальный диалог, 7 шагов с индикатором прогресса (основная информация → получатели → шаблон → страница → SMTP → расписание → сводка), шаги кликабельны только назад, не вперёд мимо обязательных полей
 
 ## Известные ограничения (см. docs/FEATURE_MATRIX.md, детали — docs/FUNCTIONAL_GAP_MATRIX.md)
 
