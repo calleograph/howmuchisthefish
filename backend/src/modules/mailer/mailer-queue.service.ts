@@ -135,8 +135,9 @@ export class MailerQueueService implements OnModuleInit, OnModuleDestroy {
         }
       }
 
+      const scope = fallbackIds.length > 0 ? `основной SMTP и ${fallbackIds.length} резервных исчерпаны` : 'резервных SMTP нет'
       this.logger.error(
-        `Не удалось отправить письмо цели ${target.id} — основной SMTP и все ${fallbackIds.length} резервных исчерпаны (последняя ошибка: ${primaryErr.message})`,
+        `Не удалось отправить письмо цели ${target.id} — ${scope} (последняя ошибка: ${primaryErr.message})`,
       );
       throw primaryErr;
     }
