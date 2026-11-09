@@ -6,6 +6,19 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
     <div
       data-slot="table-container"
       className="relative w-full overflow-x-auto"
+      // Тень у правого края сигнализирует, что таблицу можно прокрутить по
+      // горизонтали — без неё на узких экранах обрезанные колонки не
+      // выглядели как прокручиваемые. Исчезает сама по мере докрутки
+      // вправо (background-attachment: local двигается вместе с контентом),
+      // чистый CSS без отслеживания scroll-позиции через JS.
+      style={{
+        backgroundImage:
+          "linear-gradient(to right, transparent, transparent), linear-gradient(to left, oklch(0 0 0 / 10%), transparent 24px)",
+        backgroundPosition: "left, right",
+        backgroundSize: "24px 100%, 24px 100%",
+        backgroundRepeat: "no-repeat",
+        backgroundAttachment: "local, scroll",
+      }}
     >
       <table
         data-slot="table"

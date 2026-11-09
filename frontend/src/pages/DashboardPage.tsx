@@ -97,7 +97,7 @@ export default function DashboardPage() {
               формы (не количество попыток) — факт ввода, не проверенная
               реальная компрометация (это задача безопасников, не отчёта). */}
           <StatCard
-            title="Ввели пароль (скомпрометировано)"
+            title="Скомпрометировано"
             value={data?.events.compromised}
             icon={KeyRound}
             loading={isLoading}

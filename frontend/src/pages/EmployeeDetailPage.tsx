@@ -73,7 +73,12 @@ export default function EmployeeDetailPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <Link to="/employees" className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:underline">
+        {/* -mx-2 компенсирует px-2, чтобы текст остался на исходном месте,
+            а тап-зона выросла до стандартных 44px (было 20px по высоте). */}
+        <Link
+          to="/employees"
+          className="-mx-2 mb-2 inline-flex min-h-11 items-center gap-1 px-2 text-sm text-muted-foreground hover:underline"
+        >
           <ArrowLeft className="size-3.5" />
           Назад к сотрудникам
         </Link>

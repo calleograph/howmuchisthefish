@@ -54,7 +54,9 @@ export default function CampaignDetailPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+      {/* grid-cols-3 вместо -5: 6 карточек делятся без остатка (2 ровных
+          ряда), на -5 шестая карточка вставала одна в новой строке. */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <RingMetric label="Получателей" value={stats?.totalTargets} plain />
         <RingMetric label="Отправлено" value={stats?.sent} total={total} />
         <RingMetric label="Открыто" value={stats?.opened} total={total} />
