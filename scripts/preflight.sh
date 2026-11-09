@@ -44,8 +44,19 @@ echo "== Проверка диска =="
 avail_gb=$(df --output=avail -BG "$SCRIPT_DIR" 2>/dev/null | tail -1 | tr -dc '0-9' || echo 0)
 if [ "${avail_gb:-0}" -lt 5 ]; then
   note_fail "Свободно на диске менее 5 ГБ (${avail_gb}ГБ) — рекомендуется минимум 10 ГБ"
+elif [ "${avail_gb:-0}" -lt 15 ]; then
+  echo "⚠ Свободно на диске: ${avail_gb}ГБ — хватит для установки, но первая сборка Docker-образов (сотни пакетов node_modules) пройдёт заметно дольше при малом запасе места"
 else
   note_ok "Свободно на диске: ${avail_gb}ГБ"
+fi
+
+lvm_free_gb=$(sap_lvm_free_gb)
+if [ "${lvm_free_gb:-0}" -ge 2 ]; then
+  echo "⚠ В LVM volume group не выделено логическому тому ${lvm_free_gb}ГБ свободного места — диск физически больше, чем видит система."
+  echo "    Частая причина: установщик Ubuntu Server создал root-том меньше всего диска."
+  echo "    Расширить онлайн (без перезагрузки, безопасно — только рост):"
+  echo "      sudo lvextend -l +100%FREE /dev/mapper/\$(sudo vgs --noheadings -o vg_name | tr -d ' ')-\$(sudo lvs --noheadings -o lv_name | tr -d ' ')"
+  echo "      sudo resize2fs /dev/mapper/\$(sudo vgs --noheadings -o vg_name | tr -d ' ')-\$(sudo lvs --noheadings -o lv_name | tr -d ' ')   # для ext4"
 fi
 
 echo

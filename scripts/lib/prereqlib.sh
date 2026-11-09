@@ -46,6 +46,26 @@ sap_check_docker_compose_plugin() {
   docker compose version >/dev/null 2>&1
 }
 
+# Печатает суммарно свободные экстенты (в ГБ, округлено вниз) во всех LVM
+# volume group, не выделенные ни одному logical volume. На чистых установках
+# Ubuntu Server LVM иногда создаёт root LV меньше реального диска (например
+# 15 ГБ том на 32 ГБ диске) — пользователь видит "мало места", хотя физически
+# диска хватает с запасом. Найдено реальным прогоном install.sh на тестовом
+# стенде: df показывал 5 ГБ свободных при физическом диске 32 ГБ, 15 ГБ лежали
+# невыделенными в VG. Ничего не меняет, только печатает число (0, если LVM не
+# используется или vgs недоступен).
+sap_vgs_free_raw() {
+  sudo vgs --noheadings --units g --nosuffix -o vg_free 2>/dev/null
+}
+
+sap_lvm_free_gb() {
+  if ! sap_check_command vgs; then
+    echo 0
+    return 0
+  fi
+  sap_vgs_free_raw | tr -d ' ' | cut -d. -f1 | awk '{s+=$1} END {print s+0}'
+}
+
 # Печатает отсутствующие зависимости (команда + пакет), ничего не меняет.
 sap_missing_prereqs() {
   local missing=()

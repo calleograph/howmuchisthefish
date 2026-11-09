@@ -58,6 +58,30 @@ test_missing_prereqs_empty_when_all_installed
 test_missing_prereqs_lists_one_missing
 test_docker_compose_package_name_is_v2
 
+# Регрессия: на тестовом стенде LVM root-том (15 ГБ) оказался вдвое меньше
+# физического диска (32 ГБ) — установщик Ubuntu Server не выделил всё
+# пространство VG тому. df показывал "мало места", хотя диска хватало —
+# пользователь не мог понять причину медленной сборки. sap_lvm_free_gb()
+# должна корректно суммировать и округлять вывод vgs (с пробелами и без
+# дробной части).
+test_lvm_free_gb_sums_and_truncates_vgs_output() {
+  sap_check_command() { [ "$1" = "vgs" ]; }
+  sap_vgs_free_raw() { printf '  15.00\n'; }
+
+  result="$(sap_lvm_free_gb)"
+  assert_eq "sap_lvm_free_gb() суммирует и округляет вниз" "15" "$result"
+}
+
+test_lvm_free_gb_zero_when_vgs_missing() {
+  sap_check_command() { [ "$1" != "vgs" ]; }
+
+  result="$(sap_lvm_free_gb)"
+  assert_eq "sap_lvm_free_gb() равно 0, когда LVM не используется" "0" "$result"
+}
+
+test_lvm_free_gb_sums_and_truncates_vgs_output
+test_lvm_free_gb_zero_when_vgs_missing
+
 if [ "$FAILED" -ne 0 ]; then
   echo "ТЕСТЫ НЕ ПРОШЛИ" >&2
   exit 1
