@@ -128,14 +128,27 @@ process_request() {
 mkdir -p "$EXCHANGE_DIR"
 chmod 1777 "$EXCHANGE_DIR"
 
+# Heartbeat — отдельный от status.json признак живости (архитектура из
+# «Переговорки»): status.json пишет apply_update.sh только на смену этапа и
+# может не обновляться минутами во время долгой сборки — не повод считать
+# службу неработающей. helper.json пишется на КАЖДЫЙ проход таймера (каждые
+# ~10с), независимо от того, обновляется что-то сейчас или нет.
+write_heartbeat() {
+  cat > "$EXCHANGE_DIR/helper.json" <<EOF
+{"ts":"$(date -Is)","pid":$$}
+EOF
+}
+
 # Обычный режим — один проход (вызывается systemd-таймером каждые N секунд).
 # --loop — для разработки/отладки, не используется в проде.
 if [ "${1:-}" = "--loop" ]; then
   log "updater.sh запущен в режиме цикла (разработка)"
   while true; do
+    write_heartbeat
     process_request
     sleep 5
   done
 else
+  write_heartbeat
   process_request
 fi

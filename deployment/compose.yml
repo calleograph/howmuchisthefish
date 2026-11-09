@@ -63,8 +63,16 @@ services:
       # backend сам определяет недоступность по ошибке соединения и просто
       # не создаёт превью, не падает (см. pages/screenshot.service.ts).
       SCREENSHOT_SERVICE_URL: ${SCREENSHOT_SERVICE_URL:-http://screenshot-service:4000}
+      # Каталог обмена с root-helper (scripts/root-helper/) — backend пишет
+      # request.json, root-служба на хосте читает и выполняет обновление/
+      # бэкап (у контейнера нет доступа к Docker socket, см. docs/UPDATE.md).
+      SAP_EXCHANGE_DIR: /var/lib/howmuchisthefish/updater
     volumes:
       - app-storage:/data/storage
+      # Bind mount на хостовый путь (не Docker volume) — тот же физический
+      # путь, что видит root-helper systemd-служба вне контейнера. Папка
+      # создаётся install.sh на хосте с правами 1777 до первого старта.
+      - /var/lib/howmuchisthefish/updater:/var/lib/howmuchisthefish/updater
     depends_on:
       postgres:
         condition: service_healthy

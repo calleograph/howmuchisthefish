@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Plus, Server, CheckCircle2, XCircle, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { UpdateTab } from './settings/UpdateTab'
 
 interface SmtpConfig {
   id: string
@@ -80,6 +81,7 @@ export default function SettingsPage() {
         <TabsList>
           <TabsTrigger value="smtp">SMTP</TabsTrigger>
           <TabsTrigger value="maintenance">Обслуживание</TabsTrigger>
+          <TabsTrigger value="update">Обновление</TabsTrigger>
         </TabsList>
 
         <TabsContent value="smtp" className="flex flex-col gap-4">
@@ -152,6 +154,10 @@ export default function SettingsPage() {
 
         <TabsContent value="maintenance">
           <MaintenanceTab />
+        </TabsContent>
+
+        <TabsContent value="update">
+          <UpdateTab />
         </TabsContent>
       </Tabs>
     </div>

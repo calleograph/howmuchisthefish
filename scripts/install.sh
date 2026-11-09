@@ -21,7 +21,7 @@ source "$SCRIPT_DIR/lib/prereqlib.sh"
 # shellcheck source=lib/envlib.sh
 source "$SCRIPT_DIR/lib/envlib.sh"
 
-STAGES=(prerequisites dirs secrets build database migrations services healthcheck proxy done)
+STAGES=(prerequisites dirs secrets build database migrations services healthcheck proxy root_helper done)
 FROM_STAGE="prerequisites"
 DRY_RUN=0
 PROXY_MODE="caddy"
@@ -168,6 +168,37 @@ stage_proxy() {
   else
     log "Режим external-proxy: настройте свой reverse proxy по правилам в README (раздел 'Reverse-proxy маршрутизация')."
   fi
+}
+
+stage_root_helper() {
+  # Root-helper: systemd-служба на ХОСТЕ (не в контейнере), выполняющая
+  # обновление/бэкап от имени root, т.к. сам контейнер backend не имеет
+  # доступа к Docker socket (задание §5, см. docs/ARCHITECTURE.md).
+  # Непривилегированный опциональный этап: если systemd недоступен (например
+  # install.sh запущен в контейнере/без systemd) — не фатально, кнопка
+  # обновления в UI просто не будет работать, остальная система не страдает.
+  if ! command -v systemctl >/dev/null 2>&1; then
+    log "systemctl не найден — пропускаю настройку root-helper (обновление через UI будет недоступно, через командную строку — доступно всегда)"
+    return 0
+  fi
+
+  local exchange_dir="/var/lib/howmuchisthefish/updater"
+  log "Настраиваю root-helper (обновление из веб-интерфейса)..."
+  sudo mkdir -p "$exchange_dir"
+  sudo chmod 1777 "$exchange_dir"
+
+  # ExecStart в .service зависит от реального пути установки (может быть
+  # ~/howmuchisthefish, /opt/howmuchisthefish, где угодно) — подставляем
+  # его при копировании, не храним абсолютный путь в репозитории.
+  sudo sed "s|^ExecStart=.*|ExecStart=$SCRIPT_DIR/root-helper/updater.sh|" \
+    "$SCRIPT_DIR/root-helper/howmuchisthefish-updater.service" \
+    | sudo tee /etc/systemd/system/howmuchisthefish-updater.service >/dev/null
+  sudo cp "$SCRIPT_DIR/root-helper/howmuchisthefish-updater.timer" /etc/systemd/system/
+  sudo chmod +x "$SCRIPT_DIR/root-helper/updater.sh" "$SCRIPT_DIR/root-helper/check_update.sh" "$SCRIPT_DIR/root-helper/apply_update.sh"
+
+  sudo systemctl daemon-reload
+  sudo systemctl enable --now howmuchisthefish-updater.timer
+  log "root-helper настроен — обновление и резервное копирование доступны из веб-интерфейса (Настройки → Обслуживание)"
 }
 
 stage_done() {

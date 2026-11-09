@@ -20,6 +20,7 @@ import { CampaignsModule } from './modules/campaigns/campaigns.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { CustomFieldsModule } from './modules/custom-fields/custom-fields.module';
 import { MaintenanceModule } from './modules/admin/maintenance/maintenance.module';
+import { UpdateModule } from './modules/admin/update/update.module';
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { MaintenanceModule } from './modules/admin/maintenance/maintenance.modul
     ReportsModule,
     CustomFieldsModule,
     MaintenanceModule,
+    UpdateModule,
   ],
   providers: [
     // Порядок важен: Throttler → JwtAuthGuard (заполняет req.user) → RolesGuard (читает req.user).
