@@ -81,7 +81,7 @@ stage_prerequisites() {
     exit 1
   fi
 
-  bash "$SCRIPT_DIR/preflight.sh" "$ENV_FILE" || true # .env ещё может не существовать на этом этапе — не фатально здесь
+  bash "$SCRIPT_DIR/preflight.sh" "$ENV_FILE" --allow-missing-env || true
 }
 
 stage_dirs() {

@@ -24,6 +24,7 @@ test_missing_prereqs_empty_when_all_installed() {
   # Подменяем проверки так, будто всё установлено.
   sap_check_command() { return 0; }
   sap_check_docker_compose_plugin() { return 0; }
+  sap_check_docker_buildx() { return 0; }
 
   mapfile -t result < <(sap_missing_prereqs)
   assert_eq "sap_missing_prereqs() пустой массив, когда всё установлено" "0" "${#result[@]}"
@@ -32,6 +33,7 @@ test_missing_prereqs_empty_when_all_installed() {
 test_missing_prereqs_lists_one_missing() {
   sap_check_command() { [ "$1" != "docker" ]; }
   sap_check_docker_compose_plugin() { return 0; }
+  sap_check_docker_buildx() { return 0; }
 
   mapfile -t result < <(sap_missing_prereqs)
   assert_eq "ровно один недостающий пакет" "1" "${#result[@]}"
@@ -48,15 +50,30 @@ test_missing_prereqs_lists_one_missing
 test_docker_compose_package_name_is_v2() {
   sap_check_command() { return 0; }
   sap_check_docker_compose_plugin() { return 1; }
+  sap_check_docker_buildx() { return 0; }
 
   mapfile -t result < <(sap_missing_prereqs)
   assert_eq "ровно один недостающий пакет (docker compose)" "1" "${#result[@]}"
   assert_eq "правильное имя apt-пакета для docker compose" "docker-compose-plugin:docker-compose-v2" "${result[0]}"
 }
 
+# Регрессия: без docker-buildx `docker compose build` печатает пугающее для
+# нового пользователя предупреждение про Bake, хотя сборка всё равно
+# работает. Найдено реальным прогоном install.sh на тестовом стенде.
+test_docker_buildx_missing_is_detected() {
+  sap_check_command() { return 0; }
+  sap_check_docker_compose_plugin() { return 0; }
+  sap_check_docker_buildx() { return 1; }
+
+  mapfile -t result < <(sap_missing_prereqs)
+  assert_eq "ровно один недостающий пакет (buildx)" "1" "${#result[@]}"
+  assert_eq "правильное имя apt-пакета для buildx" "docker-buildx:docker-buildx" "${result[0]}"
+}
+
 test_missing_prereqs_empty_when_all_installed
 test_missing_prereqs_lists_one_missing
 test_docker_compose_package_name_is_v2
+test_docker_buildx_missing_is_detected
 
 # Регрессия: на тестовом стенде LVM root-том (15 ГБ) оказался вдвое меньше
 # физического диска (32 ГБ) — установщик Ubuntu Server не выделил всё

@@ -11,6 +11,15 @@ source "$SCRIPT_DIR/lib/prereqlib.sh"
 source "$SCRIPT_DIR/lib/envlib.sh"
 
 ENV_FILE="${1:-$SCRIPT_DIR/../deployment/.env}"
+# install.sh вызывает preflight.sh на этапе prerequisites — до того, как
+# .env вообще создаётся (этап dirs). Без этого флага отсутствие .env здесь
+# печаталось как "✗ ... Проверка не пройдена", хотя install.sh тут же сам
+# создаёт .env на следующем этапе — новый пользователь читал это как сбой
+# установки, хотя всё шло по плану (найдено реальным прогоном install.sh).
+ALLOW_MISSING_ENV=0
+if [ "${2:-}" = "--allow-missing-env" ]; then
+  ALLOW_MISSING_ENV=1
+fi
 FAILED=0
 
 note_fail() {
@@ -62,7 +71,11 @@ fi
 echo
 echo "== Проверка конфигурации =="
 if [ ! -f "$ENV_FILE" ]; then
-  note_fail "Файл .env не найден по пути $ENV_FILE (скопируйте .env.example в .env)"
+  if [ "$ALLOW_MISSING_ENV" -eq 1 ]; then
+    echo "ℹ .env ещё не создан по пути $ENV_FILE — install.sh создаст его на следующем этапе"
+  else
+    note_fail "Файл .env не найден по пути $ENV_FILE (скопируйте .env.example в .env)"
+  fi
 else
   note_ok ".env найден"
   if sap_has_unfilled_placeholders "$ENV_FILE"; then

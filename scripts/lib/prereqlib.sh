@@ -46,6 +46,16 @@ sap_check_docker_compose_plugin() {
   docker compose version >/dev/null 2>&1
 }
 
+# Без него docker compose build на каждом прогоне печатает предупреждение
+# "Docker Compose is configured to build using Bake, but buildx isn't
+# installed" — сборка и так работает (откатывается на обычный docker build),
+# но для нового пользователя выглядит как недостающая/сломанная зависимость.
+# Найдено реальным прогоном install.sh. Пакет в стандартных репозиториях
+# Ubuntu/Debian называется docker-buildx (не docker-buildx-plugin).
+sap_check_docker_buildx() {
+  docker buildx version >/dev/null 2>&1
+}
+
 # Печатает суммарно свободные экстенты (в ГБ, округлено вниз) во всех LVM
 # volume group, не выделенные ни одному logical volume. На чистых установках
 # Ubuntu Server LVM иногда создаёт root LV меньше реального диска (например
@@ -81,6 +91,9 @@ sap_missing_prereqs() {
     # нет, это ошибочное предположение по памяти, не проверенное install.sh
     # на настоящей системе до этого прогона).
     missing+=("docker-compose-plugin:docker-compose-v2")
+  fi
+  if ! sap_check_docker_buildx; then
+    missing+=("docker-buildx:docker-buildx")
   fi
   # printf с пустым массивом всё равно даёт одну пустую строку вывода —
   # mapfile в вызывающем коде тогда считает это одним (пустым) элементом.
