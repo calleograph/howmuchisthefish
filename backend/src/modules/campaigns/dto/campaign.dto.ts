@@ -3,6 +3,7 @@ import {
   ArrayNotEmpty,
   IsArray,
   IsDateString,
+  IsEnum,
   IsInt,
   IsOptional,
   IsString,
@@ -10,7 +11,41 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+
+export enum SegmentConditionDto {
+  EMAIL_OPENED = 'EMAIL_OPENED',
+  LINK_CLICKED = 'LINK_CLICKED',
+  FORM_SUBMITTED = 'FORM_SUBMITTED',
+  NOT_OPENED = 'NOT_OPENED',
+}
+
+// Таргетинг по результатам прошлой кампании — "кликнувшие в кампании X" без
+// ручного экспорта-импорта CSV (эскалационный/адаптивный сценарий обучения).
+export class SegmentTargetDto {
+  @ApiProperty({ description: 'ID кампании-источника' })
+  @IsUUID()
+  sourceCampaignId!: string;
+
+  @ApiProperty({ enum: SegmentConditionDto })
+  @IsEnum(SegmentConditionDto)
+  condition!: SegmentConditionDto;
+}
+
+export class RandomTargetDto {
+  @ApiProperty({ description: 'Сколько случайных сотрудников выбрать' })
+  @IsInt()
+  @Min(1)
+  @Max(10000)
+  count!: number;
+
+  @ApiPropertyOptional({ description: 'Ограничить выборку этой группой' })
+  @IsOptional()
+  @IsUUID()
+  groupId?: string;
+}
 
 export class CreateCampaignDto {
   @ApiProperty()
@@ -44,6 +79,18 @@ export class CreateCampaignDto {
   @IsArray()
   @IsUUID('4', { each: true })
   groupIds?: string[];
+
+  @ApiPropertyOptional({ type: SegmentTargetDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SegmentTargetDto)
+  segment?: SegmentTargetDto;
+
+  @ApiPropertyOptional({ type: RandomTargetDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => RandomTargetDto)
+  random?: RandomTargetDto;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -96,6 +143,18 @@ export class UpdateCampaignDto {
   @IsUUID('4', { each: true })
   groupIds?: string[];
 
+  @ApiPropertyOptional({ type: SegmentTargetDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SegmentTargetDto)
+  segment?: SegmentTargetDto;
+
+  @ApiPropertyOptional({ type: RandomTargetDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => RandomTargetDto)
+  random?: RandomTargetDto;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsInt()
@@ -138,4 +197,16 @@ export class BulkTargetsDto {
   @ArrayNotEmpty()
   @IsUUID('4', { each: true })
   groupIds?: string[];
+
+  @ApiPropertyOptional({ type: SegmentTargetDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => SegmentTargetDto)
+  segment?: SegmentTargetDto;
+
+  @ApiPropertyOptional({ type: RandomTargetDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => RandomTargetDto)
+  random?: RandomTargetDto;
 }

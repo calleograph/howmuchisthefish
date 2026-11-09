@@ -8,7 +8,9 @@ import { Switch } from '@/components/ui/switch'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Server, CheckCircle2, XCircle } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Plus, Server, CheckCircle2, XCircle, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface SmtpConfig {
@@ -69,68 +71,197 @@ export default function SettingsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Настройки</h1>
-          <p className="text-muted-foreground">SMTP-подключения для отправки учебных писем</p>
+      <div>
+        <h1 className="text-2xl font-semibold">Настройки</h1>
+        <p className="text-muted-foreground">SMTP-подключения и обслуживание системы</p>
+      </div>
+
+      <Tabs defaultValue="smtp">
+        <TabsList>
+          <TabsTrigger value="smtp">SMTP</TabsTrigger>
+          <TabsTrigger value="maintenance">Обслуживание</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="smtp" className="flex flex-col gap-4">
+          <div className="flex justify-end">
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger
+                render={
+                  <Button>
+                    <Plus className="size-4" />
+                    Новое подключение
+                  </Button>
+                }
+              />
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Новое SMTP-подключение</DialogTitle>
+                </DialogHeader>
+                <div className="flex flex-col gap-4">
+                  <Field label="Название" value={name} onChange={setName} />
+                  <Field label="Хост" value={host} onChange={setHost} placeholder="smtp.example.com" />
+                  <Field label="Порт" value={port} onChange={setPort} />
+                  <div className="flex items-center gap-2">
+                    <Switch checked={secure} onCheckedChange={setSecure} />
+                    <Label>TLS/STARTTLS</Label>
+                  </div>
+                  <Field label="Пользователь (опционально)" value={username} onChange={setUsername} />
+                  <Field label="Пароль (опционально)" value={password} onChange={setPassword} type="password" />
+                  <Field
+                    label="Адрес отправителя"
+                    value={fromAddress}
+                    onChange={setFromAddress}
+                    placeholder="security-training@example.local"
+                  />
+                  <Button
+                    onClick={() => createMutation.mutate()}
+                    disabled={!name || !host || !fromAddress || createMutation.isPending}
+                  >
+                    {createMutation.isPending ? 'Сохранение…' : 'Сохранить'}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {smtps?.map((smtp) => (
+              <Card key={smtp.id}>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Server className="size-4" />
+                    {smtp.name}
+                  </CardTitle>
+                  {smtp.lastTestOk === true && <CheckCircle2 className="size-4 text-success" />}
+                  {smtp.lastTestOk === false && <XCircle className="size-4 text-destructive" />}
+                </CardHeader>
+                <CardContent className="flex flex-col gap-2">
+                  <p className="text-sm text-muted-foreground">
+                    {smtp.host}:{smtp.port} {smtp.secure && <Badge variant="outline">TLS</Badge>}
+                  </p>
+                  <p className="text-sm">От: {smtp.fromAddress}</p>
+                  <TestButton
+                    smtpId={smtp.id}
+                    onTest={(toAddress) => testMutation.mutate({ id: smtp.id, toAddress })}
+                  />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="maintenance">
+          <MaintenanceTab />
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
+}
+
+const PURGE_TARGET_LABEL: Record<string, string> = {
+  audit_logs: 'Журнал действий администраторов',
+  campaign_events: 'События кампаний (открытия, переходы, отправки форм)',
+}
+
+function MaintenanceTab() {
+  const [target, setTarget] = useState<'audit_logs' | 'campaign_events'>('campaign_events')
+  const [olderThanDays, setOlderThanDays] = useState('90')
+  const [confirmOpen, setConfirmOpen] = useState(false)
+
+  const days = Number(olderThanDays) || 0
+  const { data: preview, isFetching: previewLoading } = useQuery({
+    queryKey: ['maintenance', 'purge-preview', target, days],
+    queryFn: () =>
+      api
+        .get<{ count: number }>('/admin/maintenance/purge-preview', { params: { target, olderThanDays: days } })
+        .then((r) => r.data),
+    enabled: days > 0,
+  })
+
+  const purgeMutation = useMutation({
+    mutationFn: () => api.delete<{ deleted: number }>('/admin/maintenance/purge', { data: { target, olderThanDays: days } }),
+    onSuccess: (res) => {
+      toast.success(`Удалено записей: ${res.data.deleted}`)
+      setConfirmOpen(false)
+    },
+    onError: (err: any) => toast.error(err.response?.data?.message ?? 'Не удалось удалить записи'),
+  })
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Очистка старых записей журнала</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <p className="text-sm text-muted-foreground">
+          Удаляет записи старше указанного срока. Это ручное, по требованию, решение — полноценная настраиваемая
+          политика хранения появится позже. Операция необратима.
+        </p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_auto]">
+          <div className="flex flex-col gap-2">
+            <Label>Что очистить</Label>
+            <Select value={target} onValueChange={(v) => setTarget((v as typeof target) ?? 'campaign_events')}>
+              <SelectTrigger>
+                <SelectValue placeholder="Выберите">
+                  {(v: string) => PURGE_TARGET_LABEL[v] ?? v}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(PURGE_TARGET_LABEL).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="purge-days">Старше, дней</Label>
+            <Input
+              id="purge-days"
+              type="number"
+              min={1}
+              className="w-28"
+              value={olderThanDays}
+              onChange={(e) => setOlderThanDays(e.target.value)}
+            />
+          </div>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
+
+        <p className="text-sm">
+          {previewLoading
+            ? 'Подсчёт…'
+            : preview
+              ? `Будет удалено записей: ${preview.count}`
+              : 'Укажите срок, чтобы увидеть количество записей под удаление'}
+        </p>
+
+        <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
           <DialogTrigger
             render={
-              <Button>
-                <Plus className="size-4" />
-                Новое подключение
+              <Button variant="destructive" disabled={!preview || preview.count === 0} className="w-fit">
+                <Trash2 className="size-4" />
+                Удалить
               </Button>
             }
           />
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Новое SMTP-подключение</DialogTitle>
+              <DialogTitle>Подтвердите удаление</DialogTitle>
             </DialogHeader>
             <div className="flex flex-col gap-4">
-              <Field label="Название" value={name} onChange={setName} />
-              <Field label="Хост" value={host} onChange={setHost} placeholder="smtp.example.com" />
-              <Field label="Порт" value={port} onChange={setPort} />
-              <div className="flex items-center gap-2">
-                <Switch checked={secure} onCheckedChange={setSecure} />
-                <Label>TLS/STARTTLS</Label>
-              </div>
-              <Field label="Пользователь (опционально)" value={username} onChange={setUsername} />
-              <Field label="Пароль (опционально)" value={password} onChange={setPassword} type="password" />
-              <Field label="Адрес отправителя" value={fromAddress} onChange={setFromAddress} placeholder="security-training@example.local" />
-              <Button
-                onClick={() => createMutation.mutate()}
-                disabled={!name || !host || !fromAddress || createMutation.isPending}
-              >
-                {createMutation.isPending ? 'Сохранение…' : 'Сохранить'}
+              <p className="text-sm">
+                Будет безвозвратно удалено <strong>{preview?.count ?? 0}</strong> записей
+                («{PURGE_TARGET_LABEL[target]}», старше {days} дней). Это действие нельзя отменить.
+              </p>
+              <Button variant="destructive" onClick={() => purgeMutation.mutate()} disabled={purgeMutation.isPending}>
+                {purgeMutation.isPending ? 'Удаление…' : 'Да, удалить безвозвратно'}
               </Button>
             </div>
           </DialogContent>
         </Dialog>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {smtps?.map((smtp) => (
-          <Card key={smtp.id}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Server className="size-4" />
-                {smtp.name}
-              </CardTitle>
-              {smtp.lastTestOk === true && <CheckCircle2 className="size-4 text-success" />}
-              {smtp.lastTestOk === false && <XCircle className="size-4 text-destructive" />}
-            </CardHeader>
-            <CardContent className="flex flex-col gap-2">
-              <p className="text-sm text-muted-foreground">
-                {smtp.host}:{smtp.port} {smtp.secure && <Badge variant="outline">TLS</Badge>}
-              </p>
-              <p className="text-sm">От: {smtp.fromAddress}</p>
-              <TestButton smtpId={smtp.id} onTest={(toAddress) => testMutation.mutate({ id: smtp.id, toAddress })} />
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   )
 }
 

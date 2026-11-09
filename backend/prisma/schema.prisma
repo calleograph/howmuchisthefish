@@ -39,6 +39,23 @@ enum CampaignEventType {
   EMAIL_OPENED
   LINK_CLICKED
   FORM_SUBMITTED
+  REPORTED_PHISHING // сотрудник сам сообщил о подозрительном письме — положительная метрика, не инцидент
+}
+
+enum CustomFieldType {
+  STRING
+  NUMBER
+  BOOLEAN
+  ENUM
+}
+
+// Таргетинг кампании по результатам прошлой кампании (повторный/эскалационный
+// сценарий обучения: "кликнувшие в кампании X" → цели новой кампании Y).
+enum SegmentCondition {
+  EMAIL_OPENED
+  LINK_CLICKED
+  FORM_SUBMITTED
+  NOT_OPENED
 }
 
 model User {
@@ -66,6 +83,7 @@ model Employee {
   lastName    String   // @policy:data
   department  String?  // @policy:data
   position    String?  // @policy:data
+  customFields Json    @default("{}") // @policy:data — значения доп. полей, ключи описаны в CustomFieldDef
   isActive    Boolean  @default(true)
   importedAt  DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -75,6 +93,22 @@ model Employee {
   history       EmployeeHistory[]
 
   @@map("employees")
+}
+
+// Описание дополнительных полей сотрудника, настраиваемых администратором
+// (табельный номер, локация офиса и т.п.) — значения хранятся в
+// Employee.customFields, схема полей здесь задаёт тип/метку/опции enum.
+model CustomFieldDef {
+  id           String          @id @default(uuid())
+  key          String          @unique // @policy:data — используется как ключ в Employee.customFields
+  label        String          // @policy:data
+  type         CustomFieldType // @policy:data
+  options      Json?           // @policy:data — список значений для ENUM-типа
+  defaultValue Json?           // @policy:data
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@map("custom_field_defs")
 }
 
 model EmployeeHistory {
@@ -90,11 +124,14 @@ model EmployeeHistory {
 }
 
 model Group {
-  id          String   @id @default(uuid())
-  name        String   @unique // @policy:data
-  description String?  // @policy:data
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(uuid())
+  name          String   @unique // @policy:data
+  description   String?  // @policy:data
+  parentGroupId String?  // @policy:data — вложенные группы для оргструктуры (департамент → отдел)
+  parentGroup   Group?   @relation("GroupHierarchy", fields: [parentGroupId], references: [id], onDelete: SetNull)
+  childGroups   Group[]  @relation("GroupHierarchy")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   members     EmployeeGroup[]
   targets     CampaignTarget[]
@@ -129,14 +166,15 @@ model MailTemplate {
 }
 
 model LandingPage {
-  id          String   @id @default(uuid())
-  name        String   // @policy:data
-  slug        String   @unique // @policy:data — публичный путь /lp/{slug}
-  htmlSource  String   // @policy:data — HTML учебной страницы (из конструктора или ручной правки)
-  formEnabled Boolean  @default(false) // @policy:data
-  isArchived  Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String   @id @default(uuid())
+  name           String   // @policy:data
+  slug           String   @unique // @policy:data — публичный путь /lp/{slug}
+  htmlSource     String   // @policy:data — HTML учебной страницы (из конструктора или ручной правки)
+  formEnabled    Boolean  @default(false) // @policy:data
+  screenshotPath String?  // @policy:data — путь в storage к превью-скриншоту (генерируется при сохранении)
+  isArchived     Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   campaigns   Campaign[]
 
@@ -196,6 +234,10 @@ model CampaignTarget {
   groupId     String?
   group       Group?    @relation(fields: [groupId], references: [id])
   trackingToken String  @unique @default(uuid()) // используется в pixel/redirect ссылках, не ПДн само по себе
+  // Источник таргетинга — для отображения "откуда взят этот получатель"
+  // (ручной выбор/группа/сегмент прошлой кампании/случайная выборка).
+  sourceKind       String   @default("manual") // @policy:data — manual | group | segment | random
+  sourceCampaignId String?  // @policy:data — кампания-источник для segment-таргетинга
   createdAt   DateTime  @default(now())
 
   events      CampaignEvent[]

@@ -43,7 +43,7 @@ export default function AppLayout() {
       <header className="flex items-center justify-between gap-2 border-b bg-sidebar px-4 py-3 lg:hidden">
         <div className="flex min-w-0 items-center gap-2">
           <ShieldCheck className="size-6 shrink-0 text-sidebar-primary" />
-          <span className="min-w-0 truncate font-semibold">Security Awareness</span>
+          <span className="min-w-0 truncate font-semibold">HowMuchIsTheFish</span>
         </div>
         <Button
           variant="ghost"
@@ -95,9 +95,9 @@ export default function AppLayout() {
         <div className="mb-8 flex items-center gap-2 px-2">
           <ShieldCheck className="size-6 text-sidebar-primary" />
           <span className="font-semibold leading-tight">
-            Security
+            HowMuchIs
             <br />
-            Awareness
+            TheFish
           </span>
         </div>
         <nav className="flex flex-col gap-1">

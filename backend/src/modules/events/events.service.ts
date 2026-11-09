@@ -3,16 +3,24 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { isLikelyAutomatedScanner } from './bot-detection';
 
 export type TrackableEventType =
-  'email_sent' | 'email_opened' | 'link_clicked' | 'form_submitted';
+  | 'email_sent'
+  | 'email_opened'
+  | 'link_clicked'
+  | 'form_submitted'
+  | 'reported_phishing';
 
 const TYPE_MAP: Record<
   TrackableEventType,
-  'EMAIL_SENT' | 'EMAIL_OPENED' | 'LINK_CLICKED' | 'FORM_SUBMITTED'
+  'EMAIL_SENT' | 'EMAIL_OPENED' | 'LINK_CLICKED' | 'FORM_SUBMITTED' | 'REPORTED_PHISHING'
 > = {
   email_sent: 'EMAIL_SENT',
   email_opened: 'EMAIL_OPENED',
   link_clicked: 'LINK_CLICKED',
   form_submitted: 'FORM_SUBMITTED',
+  // Сотрудник сам сообщил о подозрительном письме — положительная метрика,
+  // та же безопасная token-схема, что и у остальных событий (факт действия,
+  // без каких-либо данных формы/содержимого).
+  reported_phishing: 'REPORTED_PHISHING',
 };
 
 @Injectable()

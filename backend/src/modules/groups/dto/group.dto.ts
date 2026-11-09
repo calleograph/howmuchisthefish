@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 export class CreateGroupDto {
   @ApiProperty()
@@ -12,6 +12,11 @@ export class CreateGroupDto {
   @IsString()
   @MaxLength(1000)
   description?: string;
+
+  @ApiPropertyOptional({ description: 'Родительская группа — для оргструктуры департамент → отдел' })
+  @IsOptional()
+  @IsUUID()
+  parentGroupId?: string;
 }
 
 export class UpdateGroupDto {
@@ -26,4 +31,9 @@ export class UpdateGroupDto {
   @IsString()
   @MaxLength(1000)
   description?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  parentGroupId?: string;
 }

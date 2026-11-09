@@ -1,15 +1,59 @@
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
   ConflictException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { CustomFieldsService } from '../custom-fields/custom-fields.service';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
 
 @Injectable()
 export class EmployeesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly customFields: CustomFieldsService,
+  ) {}
+
+  // Сверяет переданные customFields со схемой полей (тип/допустимые значения
+  // для ENUM) — без этого произвольный JSON в JSONB-колонке быстро превращается
+  // в неконтролируемую свалку несовместимых значений под одним ключом.
+  private async validateCustomFields(values: Record<string, unknown>) {
+    if (Object.keys(values).length === 0) return;
+    const defs = await this.customFields.list();
+    const defByKey = new Map(defs.map((d) => [d.key, d]));
+    for (const [key, value] of Object.entries(values)) {
+      const def = defByKey.get(key);
+      if (!def) {
+        throw new BadRequestException(`Неизвестное доп. поле: ${key}`);
+      }
+      if (value === null || value === undefined) continue;
+      switch (def.type) {
+        case 'STRING':
+          if (typeof value !== 'string')
+            throw new BadRequestException(`Поле ${def.label} должно быть строкой`);
+          break;
+        case 'NUMBER':
+          if (typeof value !== 'number')
+            throw new BadRequestException(`Поле ${def.label} должно быть числом`);
+          break;
+        case 'BOOLEAN':
+          if (typeof value !== 'boolean')
+            throw new BadRequestException(`Поле ${def.label} должно быть true/false`);
+          break;
+        case 'ENUM': {
+          const options = (def.options as string[] | null) ?? [];
+          if (!options.includes(value as string))
+            throw new BadRequestException(
+              `Поле ${def.label} должно быть одним из: ${options.join(', ')}`,
+            );
+          break;
+        }
+      }
+    }
+  }
 
   async list(params: {
     search?: string;
@@ -58,14 +102,17 @@ export class EmployeesService {
     });
     if (existing)
       throw new ConflictException('Сотрудник с таким email уже существует');
+    if (dto.customFields) await this.validateCustomFields(dto.customFields);
 
-    const employee = await this.prisma.employee.create({ data: dto });
+    const employee = await this.prisma.employee.create({
+      data: { ...dto, customFields: dto.customFields as Prisma.InputJsonValue | undefined },
+    });
     await this.prisma.employeeHistory.create({
       data: {
         employeeId: employee.id,
         changedBy: actorUserId,
         changeType: 'created',
-        diff: { ...dto },
+        diff: { ...dto } as Prisma.InputJsonValue,
       },
     });
     return employee;
@@ -73,16 +120,17 @@ export class EmployeesService {
 
   async update(id: string, dto: UpdateEmployeeDto, actorUserId: string | null) {
     await this.get(id);
+    if (dto.customFields) await this.validateCustomFields(dto.customFields);
     const employee = await this.prisma.employee.update({
       where: { id },
-      data: dto,
+      data: { ...dto, customFields: dto.customFields as Prisma.InputJsonValue | undefined },
     });
     await this.prisma.employeeHistory.create({
       data: {
         employeeId: id,
         changedBy: actorUserId,
         changeType: 'updated',
-        diff: { ...dto },
+        diff: { ...dto } as Prisma.InputJsonValue,
       },
     });
     return employee;

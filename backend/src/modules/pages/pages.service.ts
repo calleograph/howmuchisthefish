@@ -1,14 +1,37 @@
 import {
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ScreenshotService } from './screenshot.service';
 import { CreatePageDto, UpdatePageDto } from './dto/page.dto';
 
 @Injectable()
 export class PagesService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(PagesService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly screenshots: ScreenshotService,
+  ) {}
+
+  // Fire-and-forget: не блокирует ответ на create/update, сервис скриншотов
+  // опционален и может отсутствовать (до 15с на попытку соединения).
+  private regenerateScreenshot(pageId: string, html: string) {
+    this.screenshots
+      .generate(html)
+      .then((path) => {
+        if (path) {
+          return this.prisma.landingPage.update({
+            where: { id: pageId },
+            data: { screenshotPath: path },
+          });
+        }
+      })
+      .catch((err) => this.logger.warn(`Не удалось обновить превью страницы ${pageId}: ${err}`));
+  }
 
   list(includeArchived = false) {
     return this.prisma.landingPage.findMany({
@@ -36,7 +59,7 @@ export class PagesService {
     });
     if (existing)
       throw new ConflictException('Страница с таким адресом уже существует');
-    return this.prisma.landingPage.create({
+    const page = await this.prisma.landingPage.create({
       data: {
         name: dto.name,
         slug: dto.slug,
@@ -44,11 +67,15 @@ export class PagesService {
         formEnabled: dto.formEnabled ?? false,
       },
     });
+    this.regenerateScreenshot(page.id, page.htmlSource);
+    return page;
   }
 
   async update(id: string, dto: UpdatePageDto) {
     await this.get(id);
-    return this.prisma.landingPage.update({ where: { id }, data: dto });
+    const page = await this.prisma.landingPage.update({ where: { id }, data: dto });
+    if (dto.htmlSource) this.regenerateScreenshot(page.id, page.htmlSource);
+    return page;
   }
 
   async duplicate(id: string) {

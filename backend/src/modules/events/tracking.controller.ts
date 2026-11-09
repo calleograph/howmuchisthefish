@@ -57,4 +57,27 @@ export class TrackingController {
       ipAddress: req.ip,
     });
   }
+
+  // Ссылка "Сообщить о фишинге" в письме — GET, не требует JS, работает из
+  // любого почтового клиента (в отличие от POST /t/event, который нужен для
+  // кнопок на HTML-странице лендинга). Редиректит на простую страницу
+  // подтверждения, не раскрывает получателю статус/детали кампании.
+  @Get('report')
+  @Header('Cache-Control', 'no-store')
+  async report(@Query('token') token: string, @Req() req: Request, @Res() res: Response) {
+    if (token) {
+      await this.events.record({
+        token,
+        type: 'reported_phishing',
+        userAgent: req.headers['user-agent'],
+        ipAddress: req.ip,
+      });
+    }
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    res.send(
+      '<!doctype html><html lang="ru"><meta charset="utf-8">' +
+        '<body style="font-family:sans-serif;max-width:480px;margin:10vh auto;text-align:center">' +
+        '<p>Спасибо! Ваше сообщение принято.</p></body></html>',
+    );
+  }
 }

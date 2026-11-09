@@ -103,8 +103,13 @@ export class MailerQueueService implements OnModuleInit, OnModuleDestroy {
         .replace(/\/$/, '');
       const landingUrl = `${publicBaseUrl}/lp/${campaign.page.slug}?token=${target.trackingToken}`;
       const pixelUrl = `${publicBaseUrl}/t/pixel.gif?token=${target.trackingToken}`;
+      // Ссылка "Сообщить о фишинге" — шаблон может вставить её явной кнопкой
+      // через {{reportPhishingUrl}}; не обязательна, просто доступна как
+      // переменная, как и landingPageUrl.
+      const reportUrl = `${publicBaseUrl}/t/report?token=${target.trackingToken}`;
       const htmlWithTracking = html
         .replace(/\{\{landingPageUrl\}\}/g, landingUrl)
+        .replace(/\{\{reportPhishingUrl\}\}/g, reportUrl)
         .replace(
           '</body>',
           `<img src="${pixelUrl}" width="1" height="1" alt="" style="display:none" /></body>`,

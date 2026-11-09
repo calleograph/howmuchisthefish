@@ -17,6 +17,7 @@ interface LandingPage {
   name: string
   slug: string
   formEnabled: boolean
+  screenshotPath: string | null
   updatedAt: string
 }
 
@@ -127,10 +128,23 @@ export default function PagesPage() {
           <p className="text-muted-foreground">Страниц пока нет — создайте первую.</p>
         )}
         {data?.map((page) => (
-          <Card key={page.id}>
+          <Card key={page.id} className="overflow-hidden">
+            {/* Превью опционально (требует отдельного screenshot-service,
+                см. docs/CONFIGURATION.md) — без него просто placeholder,
+                не ошибка. */}
+            <div className="flex aspect-video items-center justify-center border-b bg-muted">
+              {page.screenshotPath ? (
+                <img
+                  src={`/api/pages/${page.id}/screenshot`}
+                  alt={`Превью страницы ${page.name}`}
+                  className="h-full w-full object-cover object-top"
+                />
+              ) : (
+                <FileText className="size-8 text-muted-foreground" />
+              )}
+            </div>
             <CardHeader className="flex flex-row items-start justify-between pb-2">
               <CardTitle className="text-base">{page.name}</CardTitle>
-              <FileText className="size-4 shrink-0 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <code className="text-sm text-muted-foreground">/lp/{page.slug}</code>

@@ -63,10 +63,12 @@ export class CampaignsService {
       },
     });
 
-    if (dto.employeeIds?.length || dto.groupIds?.length) {
+    if (dto.employeeIds?.length || dto.groupIds?.length || dto.segment || dto.random) {
       await this.addTargets(campaign.id, {
         employeeIds: dto.employeeIds,
         groupIds: dto.groupIds,
+        segment: dto.segment,
+        random: dto.random,
       });
     }
     return this.get(campaign.id);
@@ -94,13 +96,15 @@ export class CampaignsService {
       },
     });
 
-    if (dto.employeeIds || dto.groupIds) {
+    if (dto.employeeIds || dto.groupIds || dto.segment || dto.random) {
       await this.prisma.campaignTarget.deleteMany({
         where: { campaignId: id },
       });
       await this.addTargets(id, {
         employeeIds: dto.employeeIds,
         groupIds: dto.groupIds,
+        segment: dto.segment,
+        random: dto.random,
       });
     }
     return this.get(id);
@@ -110,14 +114,45 @@ export class CampaignsService {
     const campaign = await this.get(campaignId);
     const allowedDomains = campaign.allowedDomainsOverride as string[] | null;
 
+    // Источник таргетинга на каждого сотрудника — для отображения "откуда
+    // взят этот получатель" (manual/group/segment/random) в UI кампании.
+    const sourceByEmployee = new Map<string, string>();
+    const markSource = (ids: string[], kind: string) => {
+      for (const id of ids) if (!sourceByEmployee.has(id)) sourceByEmployee.set(id, kind);
+    };
+
     const employeeIds = new Set(dto.employeeIds ?? []);
+    markSource(dto.employeeIds ?? [], 'manual');
+
     if (dto.groupIds?.length) {
+      // Рекурсивно включаем сотрудников вложенных групп — таргетинг на
+      // родительскую группу должен охватывать весь поддерево (департамент
+      // → отдел), а не только прямых участников самой группы.
+      const allGroupIds = await this.expandGroupHierarchy(dto.groupIds);
       const groupMembers = await this.prisma.employeeGroup.findMany({
-        where: { groupId: { in: dto.groupIds } },
+        where: { groupId: { in: allGroupIds } },
         select: { employeeId: true },
       });
-      groupMembers.forEach((m) => employeeIds.add(m.employeeId));
+      const groupEmployeeIds = groupMembers.map((m) => m.employeeId);
+      groupEmployeeIds.forEach((id) => employeeIds.add(id));
+      markSource(groupEmployeeIds, 'group');
     }
+
+    if (dto.segment) {
+      const segmentIds = await this.resolveSegmentTargets(
+        dto.segment.sourceCampaignId,
+        dto.segment.condition,
+      );
+      segmentIds.forEach((id) => employeeIds.add(id));
+      markSource(segmentIds, 'segment');
+    }
+
+    if (dto.random) {
+      const randomIds = await this.resolveRandomTargets(dto.random.count, dto.random.groupId);
+      randomIds.forEach((id) => employeeIds.add(id));
+      markSource(randomIds, 'random');
+    }
+
     if (employeeIds.size === 0) return { added: 0 };
 
     const employees = await this.prisma.employee.findMany({
@@ -138,13 +173,80 @@ export class CampaignsService {
       filtered.map((e) =>
         this.prisma.campaignTarget.upsert({
           where: { campaignId_employeeId: { campaignId, employeeId: e.id } },
-          create: { campaignId, employeeId: e.id },
+          create: {
+            campaignId,
+            employeeId: e.id,
+            sourceKind: sourceByEmployee.get(e.id) ?? 'manual',
+            sourceCampaignId: dto.segment?.sourceCampaignId,
+          },
           update: {},
         }),
       ),
     );
 
     return { added: filtered.length, skippedByDomain };
+  }
+
+  // Поднимает полный список ID групп включая все вложенные (дочерние)
+  // группы для переданных корневых groupIds — BFS по parentGroupId.
+  private async expandGroupHierarchy(rootGroupIds: string[]): Promise<string[]> {
+    const result = new Set(rootGroupIds);
+    let frontier = rootGroupIds;
+    while (frontier.length > 0) {
+      const children = await this.prisma.group.findMany({
+        where: { parentGroupId: { in: frontier } },
+        select: { id: true },
+      });
+      const newIds = children.map((c) => c.id).filter((id) => !result.has(id));
+      newIds.forEach((id) => result.add(id));
+      frontier = newIds;
+    }
+    return [...result];
+  }
+
+  // Таргетинг по результатам прошлой кампании: сотрудники, у которых есть
+  // событие заданного типа в кампании-источнике (NOT_OPENED — наоборот, те,
+  // у кого нет события EMAIL_OPENED, то есть кому ушло письмо, но не открыли).
+  private async resolveSegmentTargets(
+    sourceCampaignId: string,
+    condition: string,
+  ): Promise<string[]> {
+    await this.get(sourceCampaignId); // 404, если кампания-источник не существует
+
+    if (condition === 'NOT_OPENED') {
+      const targets = await this.prisma.campaignTarget.findMany({
+        where: {
+          campaignId: sourceCampaignId,
+          employeeId: { not: null },
+          events: { none: { type: 'EMAIL_OPENED' } },
+        },
+        select: { employeeId: true },
+      });
+      return targets.map((t) => t.employeeId!).filter(Boolean);
+    }
+
+    const events = await this.prisma.campaignEvent.findMany({
+      where: { campaignId: sourceCampaignId, type: condition as never },
+      select: { target: { select: { employeeId: true } } },
+    });
+    const ids = new Set(events.map((e) => e.target.employeeId).filter(Boolean) as string[]);
+    return [...ids];
+  }
+
+  private async resolveRandomTargets(count: number, groupId?: string): Promise<string[]> {
+    const where = groupId
+      ? { isActive: true, groups: { some: { groupId } } }
+      : { isActive: true };
+    const pool = await this.prisma.employee.findMany({ where, select: { id: true } });
+    const ids = pool.map((e) => e.id);
+    // Fisher-Yates shuffle в памяти — для пилотного запуска на подвыборке N
+    // из общего числа сотрудников компании (тысячи, не миллионы), не на
+    // массовых таблицах, где был бы нужен SQL TABLESAMPLE.
+    for (let i = ids.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [ids[i], ids[j]] = [ids[j], ids[i]];
+    }
+    return ids.slice(0, count);
   }
 
   async schedule(id: string, scheduledAt: Date) {
@@ -205,7 +307,7 @@ export class CampaignsService {
 
   async stats(id: string) {
     await this.get(id);
-    const [sent, opened, clicked, submitted, total] = await Promise.all([
+    const [sent, opened, clicked, submitted, reportedPhishing, total] = await Promise.all([
       this.prisma.campaignEvent.count({
         where: { campaignId: id, type: 'EMAIL_SENT' },
       }),
@@ -218,9 +320,14 @@ export class CampaignsService {
       this.prisma.campaignEvent.count({
         where: { campaignId: id, type: 'FORM_SUBMITTED' },
       }),
+      // Положительная метрика (в отличие от остальных — чем выше, тем лучше):
+      // сотрудник сам распознал и сообщил о подозрительном письме.
+      this.prisma.campaignEvent.count({
+        where: { campaignId: id, type: 'REPORTED_PHISHING' },
+      }),
       this.prisma.campaignTarget.count({ where: { campaignId: id } }),
     ]);
-    return { totalTargets: total, sent, opened, clicked, submitted };
+    return { totalTargets: total, sent, opened, clicked, submitted, reportedPhishing };
   }
 
   private async assertTemplateExists(id: string) {

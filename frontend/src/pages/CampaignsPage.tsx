@@ -14,10 +14,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Plus, Play, Pause, Square } from 'lucide-react'
 import { toast } from 'sonner'
 import { Link } from 'react-router-dom'
+
+type TargetMode = 'group' | 'segment' | 'random'
+const SEGMENT_CONDITION_LABEL: Record<string, string> = {
+  EMAIL_OPENED: 'открыли письмо',
+  LINK_CLICKED: 'перешли по ссылке',
+  FORM_SUBMITTED: 'отправили форму',
+  NOT_OPENED: 'не открыли письмо',
+}
 
 interface Campaign {
   id: string
@@ -51,7 +60,18 @@ export default function CampaignsPage() {
   const [templateId, setTemplateId] = useState('')
   const [pageId, setPageId] = useState('')
   const [smtpConfigId, setSmtpConfigId] = useState('')
+
+  const [targetMode, setTargetMode] = useState<TargetMode>('group')
   const [groupId, setGroupId] = useState('')
+  const [segmentCampaignId, setSegmentCampaignId] = useState('')
+  const [segmentCondition, setSegmentCondition] = useState('LINK_CLICKED')
+  const [randomCount, setRandomCount] = useState('10')
+  const [randomGroupId, setRandomGroupId] = useState('')
+
+  // Растянутая отправка: сколько писем в минуту уходит из очереди — явный
+  // контрол поверх уже существующего sendRateLimit/pg-boss startAfter,
+  // вместо недокументированного дефолта (найдено как UX-пробел у донора).
+  const [sendRateLimit, setSendRateLimit] = useState('10')
 
   const { data: campaigns, isLoading } = useQuery({
     queryKey: ['campaigns'],
@@ -81,7 +101,16 @@ export default function CampaignsPage() {
         templateId,
         pageId,
         smtpConfigId,
-        groupIds: groupId ? [groupId] : undefined,
+        sendRateLimit: sendRateLimit ? Number(sendRateLimit) : undefined,
+        groupIds: targetMode === 'group' && groupId ? [groupId] : undefined,
+        segment:
+          targetMode === 'segment' && segmentCampaignId
+            ? { sourceCampaignId: segmentCampaignId, condition: segmentCondition }
+            : undefined,
+        random:
+          targetMode === 'random' && randomCount
+            ? { count: Number(randomCount), groupId: randomGroupId || undefined }
+            : undefined,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['campaigns'] })
@@ -129,7 +158,87 @@ export default function CampaignsPage() {
               <SelectField label="Почтовый шаблон" value={templateId} onChange={setTemplateId} options={templates} />
               <SelectField label="Учебная страница" value={pageId} onChange={setPageId} options={pages} />
               <SelectField label="SMTP-подключение" value={smtpConfigId} onChange={setSmtpConfigId} options={smtps} />
-              <SelectField label="Группа получателей" value={groupId} onChange={setGroupId} options={groups} />
+
+              <div className="flex flex-col gap-2">
+                <Label>Получатели</Label>
+                <Tabs value={targetMode} onValueChange={(v) => setTargetMode((v as TargetMode) ?? 'group')}>
+                  <TabsList>
+                    <TabsTrigger value="group">Группа</TabsTrigger>
+                    <TabsTrigger value="segment">По результатам кампании</TabsTrigger>
+                    <TabsTrigger value="random">Случайная выборка</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="group" className="pt-3">
+                    <SelectField label="Группа получателей" value={groupId} onChange={setGroupId} options={groups} />
+                  </TabsContent>
+                  <TabsContent value="segment" className="flex flex-col gap-4 pt-3">
+                    <p className="text-sm text-muted-foreground">
+                      Таргетинг по результатам прошлой кампании — например, повторное обучение тех, кто кликнул по
+                      ссылке в кампании X.
+                    </p>
+                    <SelectField
+                      label="Кампания-источник"
+                      value={segmentCampaignId}
+                      onChange={setSegmentCampaignId}
+                      options={campaigns}
+                    />
+                    <div className="flex flex-col gap-2">
+                      <Label>Условие</Label>
+                      <Select value={segmentCondition} onValueChange={(v) => setSegmentCondition(v ?? 'LINK_CLICKED')}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Условие">
+                            {(v: string) => SEGMENT_CONDITION_LABEL[v] ?? v}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(SEGMENT_CONDITION_LABEL).map(([value, text]) => (
+                            <SelectItem key={value} value={value}>
+                              {text}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="random" className="flex flex-col gap-4 pt-3">
+                    <p className="text-sm text-muted-foreground">
+                      Безопасный пилотный запуск шаблона на небольшой случайной подвыборке перед рассылкой всей
+                      компании.
+                    </p>
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="random-count">Количество сотрудников</Label>
+                      <Input
+                        id="random-count"
+                        type="number"
+                        min={1}
+                        value={randomCount}
+                        onChange={(e) => setRandomCount(e.target.value)}
+                      />
+                    </div>
+                    <SelectField
+                      label="Ограничить группой (опционально)"
+                      value={randomGroupId}
+                      onChange={setRandomGroupId}
+                      options={groups}
+                    />
+                  </TabsContent>
+                </Tabs>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="send-rate">Скорость отправки (писем в минуту)</Label>
+                <Input
+                  id="send-rate"
+                  type="number"
+                  min={1}
+                  value={sendRateLimit}
+                  onChange={(e) => setSendRateLimit(e.target.value)}
+                />
+                <p className="text-sm text-muted-foreground">
+                  Письма рассылаются равномерно с этой скоростью, не все разом — так SMTP-релей не получает всплеск
+                  нагрузки.
+                </p>
+              </div>
+
               <Button
                 onClick={() => createMutation.mutate()}
                 disabled={!name || !templateId || !pageId || !smtpConfigId || createMutation.isPending}

@@ -57,6 +57,7 @@ export const CONFIG_REGISTRY: ConfigFieldEntry[] = [
   { model: 'EmployeeHistory', field: '*', policy: 'data' },
   { model: 'Setting', field: '*', policy: 'data' }, // политика по конкретному key — см. SETTINGS_POLICY ниже
   { model: 'Backup', field: '*', policy: 'data' }, // сама запись о бэкапе, не его содержимое
+  { model: 'CustomFieldDef', field: '*', policy: 'data' }, // схема доп. полей сотрудников — не их значения
 ];
 
 /**

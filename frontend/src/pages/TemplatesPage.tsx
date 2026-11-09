@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Plus, Mail } from 'lucide-react'
+import { Plus, Mail, Link2, Flag } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface Template {
@@ -36,6 +36,26 @@ export default function TemplatesPage() {
   const [name, setName] = useState('')
   const [subject, setSubject] = useState('')
   const [mjmlSource, setMjmlSource] = useState(DEFAULT_MJML)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Вставляет переменную-ссылку в позицию курсора — быстрее, чем вручную
+  // набирать {{landingPageUrl}}/{{reportPhishingUrl}} посреди готового
+  // корпоративного письма с кучей другого текста и разметки.
+  function insertAtCursor(token: string) {
+    const el = textareaRef.current
+    if (!el) {
+      setMjmlSource((prev) => prev + token)
+      return
+    }
+    const start = el.selectionStart
+    const end = el.selectionEnd
+    const next = mjmlSource.slice(0, start) + token + mjmlSource.slice(end)
+    setMjmlSource(next)
+    requestAnimationFrame(() => {
+      el.focus()
+      el.setSelectionRange(start + token.length, start + token.length)
+    })
+  }
 
   const { data, isLoading } = useQuery({
     queryKey: ['templates'],
@@ -85,12 +105,34 @@ export default function TemplatesPage() {
                 <Input id="tpl-subject" value={subject} onChange={(e) => setSubject(e.target.value)} />
               </div>
               <div className="flex flex-col gap-2">
-                <Label htmlFor="tpl-mjml">
-                  MJML-исходник. Переменные: <code>{'{{firstName}}'}</code>, <code>{'{{lastName}}'}</code>,{' '}
-                  <code>{'{{landingPageUrl}}'}</code>
-                </Label>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Label htmlFor="tpl-mjml">
+                    MJML-исходник. Переменные: <code>{'{{firstName}}'}</code>, <code>{'{{lastName}}'}</code>
+                  </Label>
+                  <div className="flex gap-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => insertAtCursor('{{landingPageUrl}}')}
+                    >
+                      <Link2 className="size-3.5" />
+                      Ссылка на лендинг
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => insertAtCursor('{{reportPhishingUrl}}')}
+                    >
+                      <Flag className="size-3.5" />
+                      Сообщить о фишинге
+                    </Button>
+                  </div>
+                </div>
                 <Textarea
                   id="tpl-mjml"
+                  ref={textareaRef}
                   className="min-h-[240px] font-mono text-sm"
                   value={mjmlSource}
                   onChange={(e) => setMjmlSource(e.target.value)}

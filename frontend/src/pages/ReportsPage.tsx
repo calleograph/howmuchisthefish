@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
+import { ShieldCheck } from 'lucide-react'
 
 interface EmployeeRow {
   employeeId: string
@@ -13,6 +14,7 @@ interface EmployeeRow {
   opened: number
   clicked: number
   submitted: number
+  reportedPhishing: number
 }
 
 interface GroupRow {
@@ -56,6 +58,7 @@ export default function ReportsPage() {
                   <TableHead>Открыто</TableHead>
                   <TableHead>Переходов</TableHead>
                   <TableHead>Отправлено форм</TableHead>
+                  <TableHead>Сообщил о фишинге</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -71,6 +74,16 @@ export default function ReportsPage() {
                     <TableCell>
                       {row.submitted > 0 ? (
                         <Badge variant="destructive">{row.submitted}</Badge>
+                      ) : (
+                        <span className="text-muted-foreground">0</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {row.reportedPhishing > 0 ? (
+                        <Badge className="gap-1 bg-success text-success-foreground">
+                          <ShieldCheck className="size-3" />
+                          {row.reportedPhishing}
+                        </Badge>
                       ) : (
                         <span className="text-muted-foreground">0</span>
                       )}

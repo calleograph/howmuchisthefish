@@ -16,7 +16,7 @@ export class TrackEventDto {
   @IsUUID()
   token!: string;
 
-  @ApiProperty({ enum: ['link_clicked', 'form_submitted'] })
-  @IsIn(['link_clicked', 'form_submitted'])
-  type!: 'link_clicked' | 'form_submitted';
+  @ApiProperty({ enum: ['link_clicked', 'form_submitted', 'reported_phishing'] })
+  @IsIn(['link_clicked', 'form_submitted', 'reported_phishing'])
+  type!: 'link_clicked' | 'form_submitted' | 'reported_phishing';
 }

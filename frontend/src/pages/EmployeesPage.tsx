@@ -8,8 +8,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Card } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
-import { Upload, Search, Plus, UsersRound } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Upload, Search, Plus, UsersRound, Users } from 'lucide-react'
 import { toast } from 'sonner'
+import { CustomFieldsTab } from './employees/CustomFieldsTab'
 
 interface Employee {
   id: string
@@ -30,10 +33,17 @@ interface ImportResult {
   errors: { row: number; email?: string; reason: string }[]
 }
 
+interface Group {
+  id: string
+  name: string
+  description: string | null
+  parentGroupId: string | null
+  totalMemberCount: number
+  _count: { members: number }
+}
+
 export default function EmployeesPage() {
   const [search, setSearch] = useState('')
-  const [groupDialogOpen, setGroupDialogOpen] = useState(false)
-  const [groupName, setGroupName] = useState('')
   const fileInput = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
 
@@ -43,17 +53,6 @@ export default function EmployeesPage() {
       api
         .get<{ items: Employee[]; total: number }>('/employees', { params: { search, pageSize: 50 } })
         .then((r) => r.data),
-  })
-
-  const createGroupMutation = useMutation({
-    mutationFn: () => api.post('/groups', { name: groupName }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['groups'] })
-      toast.success('Группа создана')
-      setGroupDialogOpen(false)
-      setGroupName('')
-    },
-    onError: (err: any) => toast.error(err.response?.data?.message ?? 'Не удалось создать группу'),
   })
 
   const importMutation = useMutation({
@@ -87,37 +86,9 @@ export default function EmployeesPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Сотрудники</h1>
-          <p className="text-muted-foreground">Список целей для учебных кампаний</p>
+          <p className="text-muted-foreground">Цели для учебных кампаний, группы, доп. поля</p>
         </div>
         <div className="flex gap-2">
-          <Dialog open={groupDialogOpen} onOpenChange={setGroupDialogOpen}>
-            <DialogTrigger
-              render={
-                <Button variant="outline">
-                  <UsersRound className="size-4" />
-                  Новая группа
-                </Button>
-              }
-            />
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Новая группа</DialogTitle>
-              </DialogHeader>
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="group-name">Название</Label>
-                  <Input id="group-name" value={groupName} onChange={(e) => setGroupName(e.target.value)} />
-                </div>
-                <Button
-                  onClick={() => createGroupMutation.mutate()}
-                  disabled={!groupName || createGroupMutation.isPending}
-                >
-                  <Plus className="size-4" />
-                  Создать
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
           <input ref={fileInput} type="file" accept=".csv" hidden onChange={handleFileChange} />
           <Button onClick={() => fileInput.current?.click()} disabled={importMutation.isPending}>
             <Upload className="size-4" />
@@ -126,68 +97,247 @@ export default function EmployeesPage() {
         </div>
       </div>
 
-      <div className="relative max-w-[320px]">
-        <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Поиск по email или имени…"
-          className="pl-8"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+      <Tabs defaultValue="employees">
+        <TabsList>
+          <TabsTrigger value="employees">Сотрудники</TabsTrigger>
+          <TabsTrigger value="groups">Группы</TabsTrigger>
+          <TabsTrigger value="custom-fields">Доп. поля</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="employees" className="flex flex-col gap-4">
+          <div className="relative max-w-[320px]">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Поиск по email или имени…"
+              className="pl-8"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          {/* overflow-visible: Card по умолчанию overflow-hidden, что обрезало
+              собственный overflow-x-auto контейнер Table — на узких экранах
+              таблица теряла колонки вместо горизонтальной прокрутки. min-w на
+              таблице гарантирует, что есть что прокручивать. */}
+          <Card className="overflow-visible">
+            <Table className="min-w-[640px]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Сотрудник</TableHead>
+                  <TableHead>Отдел</TableHead>
+                  <TableHead>Группы</TableHead>
+                  <TableHead>Статус</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading && (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center text-muted-foreground">
+                      Загрузка…
+                    </TableCell>
+                  </TableRow>
+                )}
+                {!isLoading && data?.items.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center text-muted-foreground">
+                      Сотрудники не найдены. Импортируйте список из CSV.
+                    </TableCell>
+                  </TableRow>
+                )}
+                {data?.items.map((emp) => (
+                  <TableRow key={emp.id}>
+                    <TableCell>
+                      <div className="font-medium">
+                        {emp.firstName} {emp.lastName}
+                      </div>
+                      <div className="text-sm text-muted-foreground">{emp.email}</div>
+                    </TableCell>
+                    <TableCell>{emp.department ?? '—'}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {emp.groups.map((g) => (
+                          <Badge key={g.group.id} variant="secondary">
+                            {g.group.name}
+                          </Badge>
+                        ))}
+                        {emp.groups.length === 0 && <span className="text-muted-foreground">—</span>}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={emp.isActive ? 'default' : 'outline'}>
+                        {emp.isActive ? 'Активен' : 'Неактивен'}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="groups">
+          <GroupsTab />
+        </TabsContent>
+
+        <TabsContent value="custom-fields">
+          <CustomFieldsTab />
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
+}
+
+function GroupsTab() {
+  const queryClient = useQueryClient()
+  const [open, setOpen] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [parentGroupId, setParentGroupId] = useState('')
+
+  const { data: groups, isLoading } = useQuery({
+    queryKey: ['groups'],
+    queryFn: () => api.get<Group[]>('/groups').then((r) => r.data),
+  })
+
+  function resetForm() {
+    setEditingId(null)
+    setName('')
+    setDescription('')
+    setParentGroupId('')
+  }
+
+  function openEdit(group: Group) {
+    setEditingId(group.id)
+    setName(group.name)
+    setDescription(group.description ?? '')
+    setParentGroupId(group.parentGroupId ?? '')
+    setOpen(true)
+  }
+
+  const saveMutation = useMutation({
+    mutationFn: () => {
+      const payload = { name, description: description || undefined, parentGroupId: parentGroupId || undefined }
+      return editingId ? api.patch(`/groups/${editingId}`, payload) : api.post('/groups', payload)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['groups'] })
+      toast.success(editingId ? 'Группа обновлена' : 'Группа создана')
+      setOpen(false)
+      resetForm()
+    },
+    onError: (err: any) => toast.error(err.response?.data?.message ?? 'Не удалось сохранить группу'),
+  })
+
+  // Кандидаты в родители — сама группа и её потомки исключены (цикл всё
+  // равно отклонит backend, но проще не предлагать заведомо невалидный выбор).
+  const parentCandidates = groups?.filter((g) => g.id !== editingId) ?? []
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex justify-end">
+        <Dialog
+          open={open}
+          onOpenChange={(v) => {
+            setOpen(v)
+            if (!v) resetForm()
+          }}
+        >
+          <DialogTrigger
+            render={
+              <Button variant="outline">
+                <UsersRound className="size-4" />
+                Новая группа
+              </Button>
+            }
+          />
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{editingId ? 'Изменить группу' : 'Новая группа'}</DialogTitle>
+            </DialogHeader>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="group-name">Название</Label>
+                <Input id="group-name" value={name} onChange={(e) => setName(e.target.value)} />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="group-description">Описание</Label>
+                <Input id="group-description" value={description} onChange={(e) => setDescription(e.target.value)} />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label>Родительская группа</Label>
+                <Select value={parentGroupId} onValueChange={(v) => setParentGroupId(v ?? '')}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Нет (группа верхнего уровня)">
+                      {(v: string) => parentCandidates.find((g) => g.id === v)?.name ?? 'Нет (группа верхнего уровня)'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {parentCandidates.map((g) => (
+                      <SelectItem key={g.id} value={g.id}>
+                        {g.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-muted-foreground">
+                  Вложенные группы наследуют таргетинг — кампания на родительскую группу охватит все дочерние.
+                </p>
+              </div>
+              <Button onClick={() => saveMutation.mutate()} disabled={!name || saveMutation.isPending}>
+                <Plus className="size-4" />
+                {editingId ? 'Сохранить' : 'Создать'}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
-      {/* overflow-visible: Card по умолчанию overflow-hidden, что обрезало
-          собственный overflow-x-auto контейнер Table — на узких экранах
-          таблица теряла колонки вместо горизонтальной прокрутки. min-w на
-          таблице гарантирует, что есть что прокручивать. */}
       <Card className="overflow-visible">
-        <Table className="min-w-[640px]">
+        <Table className="min-w-[560px]">
           <TableHeader>
             <TableRow>
-              <TableHead>Сотрудник</TableHead>
-              <TableHead>Отдел</TableHead>
-              <TableHead>Группы</TableHead>
-              <TableHead>Статус</TableHead>
+              <TableHead>Название</TableHead>
+              <TableHead>Родитель</TableHead>
+              <TableHead>Прямых участников</TableHead>
+              <TableHead>Всего (с вложенными)</TableHead>
+              <TableHead className="text-right">Действия</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading && (
               <TableRow>
-                <TableCell colSpan={4} className="text-center text-muted-foreground">
+                <TableCell colSpan={5} className="text-center text-muted-foreground">
                   Загрузка…
                 </TableCell>
               </TableRow>
             )}
-            {!isLoading && data?.items.length === 0 && (
+            {!isLoading && groups?.length === 0 && (
               <TableRow>
-                <TableCell colSpan={4} className="text-center text-muted-foreground">
-                  Сотрудники не найдены. Импортируйте список из CSV.
+                <TableCell colSpan={5} className="text-center text-muted-foreground">
+                  <Users className="mx-auto mb-2 size-6 text-muted-foreground" />
+                  Групп пока нет
                 </TableCell>
               </TableRow>
             )}
-            {data?.items.map((emp) => (
-              <TableRow key={emp.id}>
-                <TableCell>
-                  <div className="font-medium">
-                    {emp.firstName} {emp.lastName}
-                  </div>
-                  <div className="text-sm text-muted-foreground">{emp.email}</div>
+            {groups?.map((g) => (
+              <TableRow key={g.id} className="cursor-pointer" onClick={() => openEdit(g)}>
+                <TableCell className="font-medium">{g.name}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {groups.find((p) => p.id === g.parentGroupId)?.name ?? '—'}
                 </TableCell>
-                <TableCell>{emp.department ?? '—'}</TableCell>
+                <TableCell>{g._count.members}</TableCell>
                 <TableCell>
-                  <div className="flex flex-wrap gap-1">
-                    {emp.groups.map((g) => (
-                      <Badge key={g.group.id} variant="secondary">
-                        {g.group.name}
-                      </Badge>
-                    ))}
-                    {emp.groups.length === 0 && <span className="text-muted-foreground">—</span>}
-                  </div>
+                  {g.totalMemberCount !== g._count.members ? (
+                    <Badge variant="secondary">{g.totalMemberCount}</Badge>
+                  ) : (
+                    g.totalMemberCount
+                  )}
                 </TableCell>
-                <TableCell>
-                  <Badge variant={emp.isActive ? 'default' : 'outline'}>
-                    {emp.isActive ? 'Активен' : 'Неактивен'}
-                  </Badge>
+                <TableCell className="text-right">
+                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); openEdit(g) }}>
+                    Изменить
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}

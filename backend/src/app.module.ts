@@ -18,6 +18,8 @@ import { SmtpModule } from './modules/smtp/smtp.module';
 import { MailerModule } from './modules/mailer/mailer.module';
 import { CampaignsModule } from './modules/campaigns/campaigns.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { CustomFieldsModule } from './modules/custom-fields/custom-fields.module';
+import { MaintenanceModule } from './modules/admin/maintenance/maintenance.module';
 
 @Module({
   imports: [
@@ -53,6 +55,8 @@ import { ReportsModule } from './modules/reports/reports.module';
     MailerModule,
     CampaignsModule,
     ReportsModule,
+    CustomFieldsModule,
+    MaintenanceModule,
   ],
   providers: [
     // Порядок важен: Throttler → JwtAuthGuard (заполняет req.user) → RolesGuard (читает req.user).

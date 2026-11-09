@@ -1,0 +1,13 @@
+{
+  "name": "screenshot-service",
+  "version": "0.1.0",
+  "description": "Опциональный сервис превью-скриншотов учебных страниц — отдельный образ с Chromium, не часть основного backend-образа.",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "playwright-core": "1.49.1"
+  }
+}

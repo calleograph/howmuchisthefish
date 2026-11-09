@@ -7,12 +7,17 @@ export class ReportsService {
 
   /** Общая статистика по всем кампаниям (для главной панели). */
   async overview() {
-    const [totalCampaigns, totalEmployees, totalGroups, eventCounts] =
+    const [totalCampaigns, totalEmployees, totalGroups, eventCounts, firstCampaign] =
       await Promise.all([
         this.prisma.campaign.count(),
         this.prisma.employee.count({ where: { isActive: true } }),
         this.prisma.group.count(),
         this.prisma.campaignEvent.groupBy({ by: ['type'], _count: true }),
+        // Первая когда-либо созданная кампания — честная нижняя граница для
+        // дефолтного диапазона дашборда (см. timeline()): не показываем
+        // пустой график из нулей за "текущий месяц", если все данные были
+        // раньше. Найдено как UX-проблема у донора: жёсткий недефолт.
+        this.prisma.campaign.findFirst({ orderBy: { createdAt: 'asc' }, select: { createdAt: true } }),
       ]);
     const byType: Record<string, number> = {};
     for (const row of eventCounts) byType[row.type] = row._count;
@@ -21,11 +26,13 @@ export class ReportsService {
       totalCampaigns,
       totalEmployees,
       totalGroups,
+      firstCampaignAt: firstCampaign?.createdAt ?? null,
       events: {
         sent: byType.EMAIL_SENT ?? 0,
         opened: byType.EMAIL_OPENED ?? 0,
         clicked: byType.LINK_CLICKED ?? 0,
         submitted: byType.FORM_SUBMITTED ?? 0,
+        reportedPhishing: byType.REPORTED_PHISHING ?? 0,
       },
     };
   }
@@ -50,6 +57,7 @@ export class ReportsService {
         opened: number;
         clicked: number;
         submitted: number;
+        reportedPhishing: number;
       }
     >();
 
@@ -64,12 +72,14 @@ export class ReportsService {
         opened: 0,
         clicked: 0,
         submitted: 0,
+        reportedPhishing: 0,
       };
       entry.campaignsReceived++;
       for (const ev of target.events) {
         if (ev.type === 'EMAIL_OPENED') entry.opened++;
         if (ev.type === 'LINK_CLICKED') entry.clicked++;
         if (ev.type === 'FORM_SUBMITTED') entry.submitted++;
+        if (ev.type === 'REPORTED_PHISHING') entry.reportedPhishing++;
       }
       byEmployee.set(key, entry);
     }
@@ -114,9 +124,26 @@ export class ReportsService {
     });
   }
 
-  /** Временная динамика событий (по дням) — для графика на дашборде. */
-  async timeline(days = 30) {
-    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  /**
+   * Временная динамика событий (по дням) — для графика на дашборде. Если
+   * days не задан явно, диапазон начинается от первой когда-либо созданной
+   * кампании (а не "последние 30 дней") — иначе на свежеустановленной
+   * системе с данными, скажем, за прошлый месяц, график показал бы пустые
+   * нули вместо реальной картины (найденная у донора UX-проблема: жёсткий
+   * диапазон, не подстраивающийся под фактические данные, вводит в
+   * заблуждение, что система "не работает").
+   */
+  async timeline(days?: number) {
+    let since: Date;
+    if (days) {
+      since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    } else {
+      const firstCampaign = await this.prisma.campaign.findFirst({
+        orderBy: { createdAt: 'asc' },
+        select: { createdAt: true },
+      });
+      since = firstCampaign?.createdAt ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    }
     const events = await this.prisma.campaignEvent.findMany({
       where: { createdAt: { gte: since } },
       select: { type: true, createdAt: true },
@@ -130,6 +157,7 @@ export class ReportsService {
         opened: number;
         clicked: number;
         submitted: number;
+        reportedPhishing: number;
       }
     >();
     for (const ev of events) {
@@ -140,11 +168,13 @@ export class ReportsService {
         opened: 0,
         clicked: 0,
         submitted: 0,
+        reportedPhishing: 0,
       };
       if (ev.type === 'EMAIL_SENT') entry.sent++;
       if (ev.type === 'EMAIL_OPENED') entry.opened++;
       if (ev.type === 'LINK_CLICKED') entry.clicked++;
       if (ev.type === 'FORM_SUBMITTED') entry.submitted++;
+      if (ev.type === 'REPORTED_PHISHING') entry.reportedPhishing++;
       byDay.set(day, entry);
     }
     return [...byDay.values()].sort((a, b) => a.date.localeCompare(b.date));
@@ -160,12 +190,13 @@ export class ReportsService {
       orderBy: { createdAt: 'desc' },
     });
     return campaigns.map((c) => {
-      const counts = { sent: 0, opened: 0, clicked: 0, submitted: 0 };
+      const counts = { sent: 0, opened: 0, clicked: 0, submitted: 0, reportedPhishing: 0 };
       for (const ev of c.events) {
         if (ev.type === 'EMAIL_SENT') counts.sent++;
         if (ev.type === 'EMAIL_OPENED') counts.opened++;
         if (ev.type === 'LINK_CLICKED') counts.clicked++;
         if (ev.type === 'FORM_SUBMITTED') counts.submitted++;
+        if (ev.type === 'REPORTED_PHISHING') counts.reportedPhishing++;
       }
       return {
         campaignId: c.id,
@@ -198,6 +229,33 @@ export class ReportsService {
           e.type,
           e.isSuspiciousAutomated,
           e.createdAt.toISOString(),
+        ].join(',');
+      })
+      .join('\n');
+    return header + rows;
+  }
+
+  /** Экспорт сводки по сотрудникам кампании (раздельно от сырого журнала
+   * событий выше) — один сотрудник = одна строка со статусом по всем типам
+   * событий, не построчный лог. */
+  async exportCampaignUsersCsv(campaignId: string): Promise<string> {
+    const targets = await this.prisma.campaignTarget.findMany({
+      where: { campaignId },
+      include: { employee: true, events: { select: { type: true } } },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const header = 'email,sent,opened,clicked,submitted,reported_phishing\n';
+    const rows = targets
+      .map((t) => {
+        const types = new Set(t.events.map((e) => e.type));
+        return [
+          csvEscape(t.employee?.email ?? ''),
+          types.has('EMAIL_SENT'),
+          types.has('EMAIL_OPENED'),
+          types.has('LINK_CLICKED'),
+          types.has('FORM_SUBMITTED'),
+          types.has('REPORTED_PHISHING'),
         ].join(',');
       })
       .join('\n');

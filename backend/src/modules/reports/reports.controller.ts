@@ -44,4 +44,15 @@ export class ReportsController {
     );
     res.send(csv);
   }
+
+  @Get('campaigns/:id/export-users.csv')
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  async exportCampaignUsers(@Param('id') id: string, @Res() res: Response) {
+    const csv = await this.reports.exportCampaignUsersCsv(id);
+    res.set(
+      'Content-Disposition',
+      `attachment; filename="campaign-${id}-users.csv"`,
+    );
+    res.send(csv);
+  }
 }
