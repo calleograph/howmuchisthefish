@@ -88,7 +88,11 @@ function RingMetric({
   plain?: boolean
 }) {
   const v = value ?? 0
-  const pct = total && total > 0 ? Math.round((v / total) * 100) : 0
+  // Клики/отправки форм могут превышать totalTargets (один человек может
+  // открыть письмо или отправить форму несколько раз) — pct здесь означает
+  // "долю получателей, совершивших действие", не "долю событий", поэтому
+  // ограничиваем 100%, иначе кольцо получает отрицательный strokeDashoffset.
+  const pct = total && total > 0 ? Math.min(100, Math.round((v / total) * 100)) : 0
   const radius = 28
   const circumference = 2 * Math.PI * radius
   const offset = circumference * (1 - pct / 100)
