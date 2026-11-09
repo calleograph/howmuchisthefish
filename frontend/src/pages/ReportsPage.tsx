@@ -6,8 +6,9 @@ import { Card } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
-import { ShieldCheck, X } from 'lucide-react'
+import { ShieldCheck, X, Download } from 'lucide-react'
 import { ReportButton } from '@/components/ReportButton'
+import { downloadFile } from '@/lib/api'
 
 interface EmployeeRow {
   employeeId: string
@@ -88,6 +89,7 @@ export default function ReportsPage() {
         <TabsList>
           <TabsTrigger value="employees">По сотрудникам</TabsTrigger>
           <TabsTrigger value="groups">По группам</TabsTrigger>
+          <TabsTrigger value="history">История отчётов</TabsTrigger>
         </TabsList>
         <TabsContent value="employees">
           <Card className="overflow-visible">
@@ -172,7 +174,84 @@ export default function ReportsPage() {
             </Table>
           </Card>
         </TabsContent>
+        <TabsContent value="history">
+          <ReportHistory />
+        </TabsContent>
       </Tabs>
     </div>
+  )
+}
+
+interface ReportJobRow {
+  id: string
+  type: string
+  format: string
+  status: 'pending' | 'running' | 'done' | 'failed'
+  createdAt: string
+  finishedAt: string | null
+  errorMessage: string | null
+}
+
+const JOB_STATUS_LABEL: Record<ReportJobRow['status'], string> = {
+  pending: 'В очереди',
+  running: 'Формируется',
+  done: 'Готов',
+  failed: 'Ошибка',
+}
+
+function ReportHistory() {
+  const { data: jobs, isLoading } = useQuery({
+    queryKey: ['report-jobs'],
+    queryFn: () => api.get<ReportJobRow[]>('/report-jobs').then((r) => r.data),
+    refetchInterval: (q) => (q.state.data?.some((j) => j.status === 'pending' || j.status === 'running') ? 2000 : false),
+  })
+  return (
+    <Card className="overflow-visible">
+      <Table className="min-w-[560px]">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Раздел</TableHead>
+            <TableHead>Формат</TableHead>
+            <TableHead>Статус</TableHead>
+            <TableHead>Создан</TableHead>
+            <TableHead className="text-right">Файл</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {isLoading && (
+            <TableRow>
+              <TableCell colSpan={5} className="text-center text-muted-foreground">Загрузка…</TableCell>
+            </TableRow>
+          )}
+          {!isLoading && jobs?.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={5} className="text-center text-muted-foreground">
+                Отчётов пока не формировали — откройте любой раздел и нажмите «Отчёт».
+              </TableCell>
+            </TableRow>
+          )}
+          {jobs?.map((j) => (
+            <TableRow key={j.id}>
+              <TableCell className="font-medium">{j.type}</TableCell>
+              <TableCell>{j.format.toUpperCase()}</TableCell>
+              <TableCell>
+                <Badge variant={j.status === 'failed' ? 'destructive' : 'secondary'} title={j.errorMessage ?? undefined}>
+                  {JOB_STATUS_LABEL[j.status]}
+                </Badge>
+              </TableCell>
+              <TableCell>{new Date(j.createdAt).toLocaleString('ru-RU')}</TableCell>
+              <TableCell className="text-right">
+                {j.status === 'done' && (
+                  <Button variant="ghost" size="sm" onClick={() => downloadFile(`/report-jobs/${j.id}/download`, `${j.type}-report.${j.format}`)}>
+                    <Download className="size-3.5" />
+                    Скачать
+                  </Button>
+                )}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </Card>
   )
 }
