@@ -32,7 +32,7 @@ interface CapturedVariant {
   fieldName: string
   valueHash: string
   firstSeenAt: string
-  eventId: string
+  credentialId: string
 }
 
 interface CampaignHistory {
@@ -197,7 +197,7 @@ function CredentialRevealRow({ campaignId, variant }: { campaignId: string; vari
   const revealMutation = useMutation({
     mutationFn: () =>
       api
-        .get<{ fieldName: string; value: string }>(`/campaigns/${campaignId}/events/${variant.eventId}/credential`)
+        .get<{ fieldName: string; value: string }>(`/campaigns/${campaignId}/events/credentials/${variant.credentialId}`)
         .then((r) => r.data),
     onSuccess: (result) => setRevealed(result.value),
     onError: (err: any) => toast.error(err.response?.data?.message ?? 'Не удалось расшифровать значение'),

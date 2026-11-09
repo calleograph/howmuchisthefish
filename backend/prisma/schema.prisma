@@ -276,7 +276,7 @@ model CampaignEvent {
   ipAddress   String?           // @policy:data — точный IP, как получает его сервер (внешний/NAT-адрес клиента)
   createdAt   DateTime          @default(now())
 
-  credential  CapturedCredential?
+  credentials CapturedCredential[]
 
   @@index([campaignId, type])
   @@map("campaign_events")
@@ -291,13 +291,18 @@ model CampaignEvent {
 // reveal-эндпоинт с ролью ADMIN и обязательной записью в AuditLog.
 model CapturedCredential {
   id          String        @id @default(uuid())
-  eventId     String        @unique
+  // НЕ @unique: одна отправка формы (один CampaignEvent) обычно содержит
+  // несколько полей (login + password) — каждое уникальное значение поля
+  // за эту отправку создаёт отдельную запись. Найдено реальным
+  // тестированием: constraint-ошибка при >1 поле в форме.
+  eventId     String
   event       CampaignEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
   fieldName   String        // @policy:data — имя поля формы (login/password/email и т.п.), не секрет само по себе
   valueEnc    String        // @policy:reset — AES-256-GCM, отдельный ключ (CREDENTIAL_ENCRYPTION_KEY, не APP_MASTER_KEY) — без исходного ключа на новом сервере не восстановить, см. SECURITY.md
   valueHash   String        // @policy:hash — SHA-256 от исходного значения, для дедупликации БЕЗ расшифровки (см. "варианты ввода")
   createdAt   DateTime      @default(now())
 
+  @@index([eventId])
   @@map("captured_credentials")
 }
 

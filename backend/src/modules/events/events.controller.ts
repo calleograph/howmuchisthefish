@@ -15,16 +15,19 @@ export class EventsController {
   }
 
   // Расшифровка конкретного перехваченного значения — явное действие,
-  // не возвращается вместе со списком событий/статистикой. ADMIN-only +
-  // обязательный audit-log на каждый факт расшифровки (кто, когда, какая
-  // запись) — см. docs/SECURITY.md.
+  // не возвращается вместе со списком событий/статистикой. Адресуется по
+  // ID самой записи CapturedCredential (не eventId — одна отправка формы
+  // обычно содержит несколько полей, у события может быть несколько
+  // credentials, нужно однозначно указать, какое именно расшифровать).
+  // ADMIN-only + обязательный audit-log на каждый факт расшифровки (кто,
+  // когда, какая запись) — см. docs/SECURITY.md.
   @Roles('ADMIN')
-  @Get(':eventId/credential')
+  @Get('credentials/:credentialId')
   reveal(
     @Param('campaignId') campaignId: string,
-    @Param('eventId') eventId: string,
+    @Param('credentialId') credentialId: string,
     @Request() req: any,
   ) {
-    return this.events.revealCredential(campaignId, eventId, req.user?.id ?? null, req.ip);
+    return this.events.revealCredential(campaignId, credentialId, req.user?.id ?? null, req.ip);
   }
 }

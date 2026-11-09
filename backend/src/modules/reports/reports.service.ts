@@ -23,7 +23,7 @@ export class ReportsService {
         // (сотрудник, подобравший 3 варианта пароля подряд, всё равно один
         // человек, не три инцидента). distinct по targetId через группировку.
         this.prisma.campaignTarget.count({
-          where: { events: { some: { credential: { isNot: null } } } },
+          where: { events: { some: { credentials: { some: {} } } } },
         }),
       ]);
     const byType: Record<string, number> = {};
@@ -118,7 +118,7 @@ export class ReportsService {
         campaign: { select: { id: true, name: true, status: true } },
         events: {
           orderBy: { createdAt: 'asc' },
-          include: { credential: { select: { id: true, fieldName: true, valueHash: true, createdAt: true } } },
+          include: { credentials: { select: { id: true, fieldName: true, valueHash: true, createdAt: true } } },
         },
       },
       orderBy: { createdAt: 'desc' },
@@ -147,20 +147,25 @@ export class ReportsService {
       });
 
       // Уникальные варианты пароля за ВСЕ submit этой кампании-цели (дедуп
-      // по valueHash уже на уровне записи в БД — здесь просто считаем группы).
+      // по valueHash уже на уровне записи в БД для одного события — здесь
+      // дополнительно дедуплицируем между разными событиями/полями тоже).
+      // credentialId — id самой записи CapturedCredential, нужен для
+      // однозначного reveal (один eventId может иметь несколько записей —
+      // login и password это две разные credentials одного события).
       const uniqueCredentials = new Map<
         string,
-        { fieldName: string; valueHash: string; firstSeenAt: Date; eventId: string }
+        { fieldName: string; valueHash: string; firstSeenAt: Date; credentialId: string }
       >();
       for (const ev of target.events) {
-        if (!ev.credential) continue;
-        if (!uniqueCredentials.has(ev.credential.valueHash)) {
-          uniqueCredentials.set(ev.credential.valueHash, {
-            fieldName: ev.credential.fieldName,
-            valueHash: ev.credential.valueHash,
-            firstSeenAt: ev.credential.createdAt,
-            eventId: ev.id,
-          });
+        for (const cred of ev.credentials) {
+          if (!uniqueCredentials.has(cred.valueHash)) {
+            uniqueCredentials.set(cred.valueHash, {
+              fieldName: cred.fieldName,
+              valueHash: cred.valueHash,
+              firstSeenAt: cred.createdAt,
+              credentialId: cred.id,
+            });
+          }
         }
       }
 

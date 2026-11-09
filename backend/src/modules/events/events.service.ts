@@ -136,20 +136,20 @@ export class EventsService {
   // расшифрованное значение нигде за пределами этого ответа.
   async revealCredential(
     campaignId: string,
-    eventId: string,
+    credentialId: string,
     actorUserId: string | null,
     actorIp?: string,
   ) {
     const credential = await this.prisma.capturedCredential.findFirst({
-      where: { eventId, event: { campaignId } },
+      where: { id: credentialId, event: { campaignId } },
     });
     await this.prisma.auditLog.create({
       data: {
         userId: actorUserId,
         action: 'reveal_captured_credential',
         entityType: 'CapturedCredential',
-        entityId: credential?.id ?? eventId,
-        metadata: { campaignId, eventId, found: !!credential },
+        entityId: credentialId,
+        metadata: { campaignId, credentialId, found: !!credential },
         ipAddress: actorIp ?? null,
       },
     });

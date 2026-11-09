@@ -330,7 +330,7 @@ export class CampaignsService {
       // событий/попыток) — см. ReportsService.overview() для той же логики
       // на уровне всех кампаний.
       this.prisma.campaignTarget.count({
-        where: { campaignId: id, events: { some: { credential: { isNot: null } } } },
+        where: { campaignId: id, events: { some: { credentials: { some: {} } } } },
       }),
     ]);
     return { totalTargets: total, sent, opened, clicked, submitted, reportedPhishing, compromised };
