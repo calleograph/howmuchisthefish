@@ -61,6 +61,7 @@ describe('MailerQueueService — handleSend', () => {
     smtp = {
       getTransportForCampaign: jest.fn().mockResolvedValue({ sendMail: jest.fn().mockResolvedValue({}) }),
       get: jest.fn().mockResolvedValue({ fromAddress: 'noreply@example.com' }),
+      listIdsExcept: jest.fn().mockResolvedValue([]),
     };
     mjml = { renderWithData: jest.fn().mockResolvedValue({ html: '<p>ok</p>', errors: [] }) };
 
@@ -115,15 +116,60 @@ describe('MailerQueueService — handleSend', () => {
     });
   });
 
-  it('пробрасывает ошибку SMTP дальше — иначе pg-boss retryLimit никогда не сработает', async () => {
+  it('пробрасывает ошибку SMTP дальше на промежуточной попытке — иначе pg-boss retryLimit никогда не сработает', async () => {
     smtp.getTransportForCampaign.mockResolvedValue({
       sendMail: jest.fn().mockRejectedValue(new Error('ECONNREFUSED')),
     });
 
+    // retryCount=1 из 3 (RETRY_LIMIT) — НЕ последняя попытка, failover ещё
+    // не должен включаться, ошибка просто пробрасывается для pg-boss retry.
     await expect(
       (service as any).handleSend({ campaignId: 'campaign-1', targetId: 'target-1' }, 1),
     ).rejects.toThrow('ECONNREFUSED');
     expect(prisma.campaignEvent.create).not.toHaveBeenCalled();
+    expect(smtp.listIdsExcept).not.toHaveBeenCalled();
+  });
+
+  describe('failover на другой SMTP (только на последней retry-попытке)', () => {
+    it('пробует резервный SMTP, если основной не ответил на последней попытке, и отправляет через него', async () => {
+      const failingTransport = { sendMail: jest.fn().mockRejectedValue(new Error('ECONNREFUSED')) };
+      const workingTransport = { sendMail: jest.fn().mockResolvedValue({}) };
+      smtp.getTransportForCampaign.mockImplementation((id: string) =>
+        Promise.resolve(id === 'smtp-1' ? failingTransport : workingTransport),
+      );
+      smtp.listIdsExcept.mockResolvedValue(['smtp-2', 'smtp-3']);
+
+      // retryCount=2 из RETRY_LIMIT=3 (индекс с 0) — это последняя попытка.
+      await (service as any).handleSend({ campaignId: 'campaign-1', targetId: 'target-1' }, 2);
+
+      expect(smtp.listIdsExcept).toHaveBeenCalledWith('smtp-1');
+      expect(workingTransport.sendMail).toHaveBeenCalledTimes(1);
+      expect(prisma.campaignEvent.create).toHaveBeenCalledWith({
+        data: { campaignId: 'campaign-1', targetId: 'target-1', type: 'EMAIL_SENT' },
+      });
+    });
+
+    it('пробрасывает исходную ошибку, если основной и все резервные SMTP не сработали', async () => {
+      const failingTransport = { sendMail: jest.fn().mockRejectedValue(new Error('primary down')) };
+      smtp.getTransportForCampaign.mockResolvedValue(failingTransport);
+      smtp.listIdsExcept.mockResolvedValue(['smtp-2']);
+
+      await expect(
+        (service as any).handleSend({ campaignId: 'campaign-1', targetId: 'target-1' }, 2),
+      ).rejects.toThrow('primary down');
+      expect(prisma.campaignEvent.create).not.toHaveBeenCalled();
+    });
+
+    it('не трогает failover, если других SMTP-подключений нет', async () => {
+      smtp.getTransportForCampaign.mockResolvedValue({
+        sendMail: jest.fn().mockRejectedValue(new Error('only smtp down')),
+      });
+      smtp.listIdsExcept.mockResolvedValue([]);
+
+      await expect(
+        (service as any).handleSend({ campaignId: 'campaign-1', targetId: 'target-1' }, 2),
+      ).rejects.toThrow('only smtp down');
+    });
   });
 
   it('использует домен страницы для landingUrl, если он задан', async () => {

@@ -27,6 +27,21 @@ export class SmtpConfigService {
     return configs.map(omitPassword);
   }
 
+  /**
+   * ID всех SMTP-подключений, кроме указанного — используется
+   * mailer-queue.service.ts для failover: если отправка через SMTP кампании
+   * не удалась после всех retry, пробуем остальные подключения по порядку
+   * (docs/FUNCTIONAL_GAP_MATRIX.md §9, "multi-SMTP failover").
+   */
+  async listIdsExcept(excludeId: string): Promise<string[]> {
+    const configs = await this.prisma.smtpConfig.findMany({
+      where: { id: { not: excludeId } },
+      orderBy: { name: 'asc' },
+      select: { id: true },
+    });
+    return configs.map((c) => c.id);
+  }
+
   async get(id: string) {
     const config = await this.prisma.smtpConfig.findUnique({ where: { id } });
     if (!config) throw new NotFoundException('SMTP-подключение не найдено');

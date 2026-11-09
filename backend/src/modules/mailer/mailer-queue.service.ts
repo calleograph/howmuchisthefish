@@ -11,6 +11,10 @@ import { SmtpConfigService } from '../smtp/smtp-config.service';
 import { MjmlRenderService } from '../templates/mjml-render.service';
 
 const QUEUE_NAME = 'campaign-send-email';
+// Используется и в createQueue(), и в handleSend() (чтобы узнать "это
+// последняя попытка?") — единственное число, не дублируется как магическая
+// константа в двух местах.
+const RETRY_LIMIT = 3;
 
 interface SendJobData {
   campaignId: string;
@@ -49,7 +53,7 @@ export class MailerQueueService implements OnModuleInit, OnModuleDestroy {
     // сбои (неверный email и т.п.) — после исчерпания лимита письмо
     // просто не получает EMAIL_SENT, как и раньше, видно в отчёте кампании.
     await this.boss.createQueue(QUEUE_NAME, {
-      retryLimit: 3,
+      retryLimit: RETRY_LIMIT,
       retryBackoff: true,
     });
     await this.boss.work<SendJobData>(QUEUE_NAME, async ([job]) =>
@@ -95,91 +99,106 @@ export class MailerQueueService implements OnModuleInit, OnModuleDestroy {
 
     const { campaign } = target;
     try {
-      const transport = await this.smtp.getTransportForCampaign(
-        campaign.smtpConfigId,
-      );
-      // department/position/customFields уже есть в модели Employee, но не
-      // попадали в реальную рассылку (только firstName/lastName) — малое
-      // доделывание из матрицы, docs/FUNCTIONAL_GAP_MATRIX.md §4.
-      // customFields (произвольный JSON — text/number/boolean/select из
-      // CustomFieldDef) приводится к строке: renderWithData ожидает
-      // Record<string, string>, значения могут быть не строками. Идёт
-      // ПЕРВЫМ в объекте — явные поля ниже (firstName и т.д.) всегда
-      // побеждают при совпадении ключа, а не наоборот.
-      const customFieldsRaw =
-        typeof target.employee.customFields === 'object' &&
-        target.employee.customFields !== null
-          ? (target.employee.customFields as Record<string, unknown>)
-          : {};
-      const customFields = Object.fromEntries(
-        Object.entries(customFieldsRaw).map(([key, value]) => [key, String(value ?? '')]),
-      );
-      const { html } = await this.mjml.renderWithData(
-        campaign.template.mjmlSource,
-        {
-          ...customFields,
-          firstName: target.employee.firstName,
-          lastName: target.employee.lastName,
-          department: target.employee.department ?? '',
-          position: target.employee.position ?? '',
-        },
-      );
-      const smtpConfig = await this.smtp.get(campaign.smtpConfigId);
-
-      // Ссылки на учебную страницу и пиксель открытия встраиваются с trackingToken цели.
-      const publicBaseUrl = this.config
-        .get<string>('PUBLIC_BASE_URL', '')
-        .replace(/\/$/, '');
-      // Если у страницы есть собственный верифицированный домен — ссылка на
-      // неё ведёт туда (похожий на цель URL для кампании), а служебные
-      // pixel/report-эндпоинты остаются на основном PUBLIC_BASE_URL — это
-      // backend-маршруты приложения, не часть похожей на цель страницы.
-      const page = await this.prisma.landingPage.findUnique({
-        where: { id: campaign.pageId },
-        include: { domain: true },
-      });
-      const landingBaseUrl = page?.domain
-        ? `https://${page.domain.hostname}`
-        : publicBaseUrl;
-      const landingUrl = `${landingBaseUrl}/lp/${campaign.page.slug}?token=${target.trackingToken}`;
-      const pixelUrl = `${publicBaseUrl}/t/pixel.gif?token=${target.trackingToken}`;
-      // Ссылка "Сообщить о фишинге" — шаблон может вставить её явной кнопкой
-      // через {{reportPhishingUrl}}; не обязательна, просто доступна как
-      // переменная, как и landingPageUrl.
-      const reportUrl = `${publicBaseUrl}/t/report?token=${target.trackingToken}`;
-      const htmlWithTracking = html
-        .replace(/\{\{landingPageUrl\}\}/g, landingUrl)
-        .replace(/\{\{reportPhishingUrl\}\}/g, reportUrl)
-        .replace(
-          '</body>',
-          `<img src="${pixelUrl}" width="1" height="1" alt="" style="display:none" /></body>`,
+      await this.sendVia(campaign.smtpConfigId, target, campaign);
+    } catch (primaryErr: any) {
+      // Failover: только на ПОСЛЕДНЕЙ попытке pg-boss retry (retryCount
+      // считает с 0, RETRY_LIMIT — общее число попыток, созданных в
+      // onModuleInit) — пробовать другие SMTP на каждом промежуточном
+      // retry бессмысленно и дорого (до RETRY_LIMIT × N_SMTP реальных
+      // сетевых попыток вместо RETRY_LIMIT + N_SMTP). Имеет смысл только
+      // как последний шанс перед тем, как письмо точно не получит
+      // EMAIL_SENT. См. docs/FUNCTIONAL_GAP_MATRIX.md §9.
+      if (retryCount < RETRY_LIMIT - 1) {
+        this.logger.error(
+          `Не удалось отправить письмо цели ${target.id} через SMTP ${campaign.smtpConfigId} (попытка ${retryCount + 1}): ${primaryErr.message}`,
         );
+        throw primaryErr;
+      }
 
-      await transport.sendMail({
-        from: smtpConfig.fromAddress,
-        to: target.employee.email,
-        subject: campaign.template.subject,
-        html: htmlWithTracking,
-      });
+      const fallbackIds = await this.smtp.listIdsExcept(campaign.smtpConfigId);
+      for (const fallbackId of fallbackIds) {
+        try {
+          await this.sendVia(fallbackId, target, campaign);
+          this.logger.warn(
+            `Письмо цели ${target.id} отправлено через резервный SMTP ${fallbackId} — основной (${campaign.smtpConfigId}) не ответил: ${primaryErr.message}`,
+          );
+          return;
+        } catch {
+          // Пробуем следующий резервный SMTP — конкретная ошибка каждого
+          // неважна, важен только факт, что ни один так и не сработал
+          // (логируется ниже, после цикла).
+        }
+      }
 
-      await this.prisma.campaignEvent.create({
-        data: {
-          campaignId: campaign.id,
-          targetId: target.id,
-          type: 'EMAIL_SENT',
-        },
-      });
-    } catch (err: any) {
-      // retryLimit=3 задан на уровне очереди (onModuleInit) — re-throw даёт
-      // pg-boss повторить задачу с экспоненциальной задержкой; после
-      // последней исчерпанной попытки письмо просто не получает EMAIL_SENT
-      // (видно в отчёте кампании как "не отправлено"), не создаём отдельный
-      // тип события для провала — в модели его сейчас нет, а домысливать
-      // новый enum-кейс ради лог-сообщения избыточно.
       this.logger.error(
-        `Не удалось отправить письмо цели ${target.id} (попытка ${retryCount + 1}): ${err.message}`,
+        `Не удалось отправить письмо цели ${target.id} — основной SMTP и все ${fallbackIds.length} резервных исчерпаны (последняя ошибка: ${primaryErr.message})`,
       );
-      throw err;
+      throw primaryErr;
     }
+  }
+
+  /** Рендерит письмо с персонализацией цели и отправляет через указанный SMTP. */
+  private async sendVia(smtpConfigId: string, target: any, campaign: any) {
+    const transport = await this.smtp.getTransportForCampaign(smtpConfigId);
+    // department/position/customFields уже есть в модели Employee, но не
+    // попадали в реальную рассылку (только firstName/lastName) — малое
+    // доделывание из матрицы, docs/FUNCTIONAL_GAP_MATRIX.md §4.
+    // customFields (произвольный JSON — text/number/boolean/select из
+    // CustomFieldDef) приводится к строке: renderWithData ожидает
+    // Record<string, string>, значения могут быть не строками. Идёт
+    // ПЕРВЫМ в объекте — явные поля ниже (firstName и т.д.) всегда
+    // побеждают при совпадении ключа, а не наоборот.
+    const customFieldsRaw =
+      typeof target.employee.customFields === 'object' && target.employee.customFields !== null
+        ? (target.employee.customFields as Record<string, unknown>)
+        : {};
+    const customFields = Object.fromEntries(
+      Object.entries(customFieldsRaw).map(([key, value]) => [key, String(value ?? '')]),
+    );
+    const { html } = await this.mjml.renderWithData(campaign.template.mjmlSource, {
+      ...customFields,
+      firstName: target.employee.firstName,
+      lastName: target.employee.lastName,
+      department: target.employee.department ?? '',
+      position: target.employee.position ?? '',
+    });
+    const smtpConfig = await this.smtp.get(smtpConfigId);
+
+    // Ссылки на учебную страницу и пиксель открытия встраиваются с trackingToken цели.
+    const publicBaseUrl = this.config.get<string>('PUBLIC_BASE_URL', '').replace(/\/$/, '');
+    // Если у страницы есть собственный верифицированный домен — ссылка на
+    // неё ведёт туда (похожий на цель URL для кампании), а служебные
+    // pixel/report-эндпоинты остаются на основном PUBLIC_BASE_URL — это
+    // backend-маршруты приложения, не часть похожей на цель страницы.
+    const page = await this.prisma.landingPage.findUnique({
+      where: { id: campaign.pageId },
+      include: { domain: true },
+    });
+    const landingBaseUrl = page?.domain ? `https://${page.domain.hostname}` : publicBaseUrl;
+    const landingUrl = `${landingBaseUrl}/lp/${campaign.page.slug}?token=${target.trackingToken}`;
+    const pixelUrl = `${publicBaseUrl}/t/pixel.gif?token=${target.trackingToken}`;
+    // Ссылка "Сообщить о фишинге" — шаблон может вставить её явной кнопкой
+    // через {{reportPhishingUrl}}; не обязательна, просто доступна как
+    // переменная, как и landingPageUrl.
+    const reportUrl = `${publicBaseUrl}/t/report?token=${target.trackingToken}`;
+    const htmlWithTracking = html
+      .replace(/\{\{landingPageUrl\}\}/g, landingUrl)
+      .replace(/\{\{reportPhishingUrl\}\}/g, reportUrl)
+      .replace('</body>', `<img src="${pixelUrl}" width="1" height="1" alt="" style="display:none" /></body>`);
+
+    await transport.sendMail({
+      from: smtpConfig.fromAddress,
+      to: target.employee.email,
+      subject: campaign.template.subject,
+      html: htmlWithTracking,
+    });
+
+    await this.prisma.campaignEvent.create({
+      data: {
+        campaignId: campaign.id,
+        targetId: target.id,
+        type: 'EMAIL_SENT',
+      },
+    });
   }
 }
