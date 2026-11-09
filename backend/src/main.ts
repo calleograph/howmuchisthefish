@@ -1,15 +1,24 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import type { NestExpressApplication } from '@nestjs/platform-express';
+import * as express from 'express';
 import helmet from 'helmet';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
   app.useLogger(app.get(Logger));
 
   app.use(helmet());
+  // Дефолт Express (100kb) слишком мал для htmlSource учебной страницы —
+  // клонированные граббером реальные сайты (не синтетические тестовые
+  // страницы) легко превышают его, запрос падает с 413 без объяснения в
+  // интерфейсе. 10 МБ с запасом покрывает даже крупные одностраничные
+  // сайты; дальнейший рост (видео/десятки МБ разметки) уже не является
+  // учебной фишинговой страницей, упирать лимит в них незачем.
+  app.use(express.json({ limit: '10mb' }));
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true, // отбрасывает поля, не описанные в DTO — защита от лишних полей в теле запроса

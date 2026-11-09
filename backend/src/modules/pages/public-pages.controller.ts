@@ -9,6 +9,7 @@ import { PagesService } from './pages.service';
 import { ScreenshotService } from './screenshot.service';
 import { EventsService } from '../events/events.service';
 import { buildCapturingFormScript, buildSafeFormScript } from './safe-form-injector';
+import { EXT_CONTENT_TYPE } from './asset-content-type';
 
 /**
  * Публичная раздача учебных страниц по адресу /lp/{slug}?token={trackingToken}.
@@ -82,23 +83,6 @@ export class PublicPagesController {
     res.send(html);
   }
 }
-
-// Расширения соответствуют тем, что screenshot-service присваивает файлам
-// при клонировании (см. extForContentType в screenshot-service/server.js) —
-// держать в синхроне с тем списком, не произвольный общий mime-реестр.
-const EXT_CONTENT_TYPE: Record<string, string> = {
-  css: 'text/css',
-  js: 'application/javascript',
-  png: 'image/png',
-  jpg: 'image/jpeg',
-  gif: 'image/gif',
-  svg: 'image/svg+xml',
-  webp: 'image/webp',
-  ico: 'image/x-icon',
-  woff2: 'font/woff2',
-  woff: 'font/woff',
-  ttf: 'font/ttf',
-};
 
 function contentTypeByExtension(filename: string): string {
   const ext = filename.split('.').pop()?.toLowerCase() ?? '';

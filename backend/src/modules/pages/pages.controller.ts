@@ -12,20 +12,51 @@ import {
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { createReadStream, existsSync } from 'fs';
-import { join } from 'path';
+import { basename, join } from 'path';
 import { Roles } from '../auth/roles.decorator';
+import { Public } from '../auth/public.decorator';
 import { PagesService } from './pages.service';
+import { ScreenshotService } from './screenshot.service';
 import { CreatePageDto, UpdatePageDto, CloneUrlDto } from './dto/page.dto';
+import { EXT_CONTENT_TYPE } from './asset-content-type';
 
 @ApiTags('pages')
 @ApiBearerAuth()
 @Controller('pages')
 export class PagesController {
-  constructor(private readonly pages: PagesService) {}
+  constructor(
+    private readonly pages: PagesService,
+    private readonly screenshots: ScreenshotService,
+  ) {}
 
   @Get()
   list(@Query('includeArchived') includeArchived?: string) {
     return this.pages.list(includeArchived === 'true');
+  }
+
+  // Раздача ресурсов клона ДО сохранения страницы — редактор показывает
+  // предпросмотр по cloneId (см. clonePreview ниже), у которого ещё нет
+  // slug для /lp/:slug/assets/:filename. @Public(), не JWT: обычные
+  // ресурсные запросы браузера (img/link в iframe-предпросмотре) не несут
+  // Authorization-заголовок, подставить его некуда. Защита —
+  // непредсказуемый cloneId (UUID), тот же принцип, что у trackingToken
+  // участника кампании: самостоятельная непрозрачная строка как секрет,
+  // не отдельный auth-слой. Живёт недолго — до сохранения страницы
+  // (дальше раздача идёт по постоянному pageId тем же способом).
+  // Регистрируется ПЕРЕД :id, иначе Nest принял бы "clone-preview" за id.
+  @Public()
+  @Get('clone-preview/:cloneId/assets/:filename')
+  async clonePreviewAsset(
+    @Param('cloneId') cloneId: string,
+    @Param('filename') filename: string,
+    @Res() res: Response,
+  ) {
+    const safeFilename = basename(filename);
+    const filePath = this.screenshots.tmpClonedAssetPath(cloneId, safeFilename);
+    if (!existsSync(filePath)) throw new NotFoundException('Ресурс не найден');
+    const ext = safeFilename.split('.').pop()?.toLowerCase() ?? '';
+    res.set('Content-Type', EXT_CONTENT_TYPE[ext] ?? 'application/octet-stream');
+    createReadStream(filePath).pipe(res);
   }
 
   @Get(':id')

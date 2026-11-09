@@ -156,6 +156,23 @@ export default function PageEditorPage() {
     onError: (err: any) => toast.error(err.response?.data?.message ?? 'Не удалось сохранить страницу'),
   })
 
+  // srcDoc резолвит относительные пути (assets/…) относительно родительской
+  // страницы /pages/..., не относительно виртуального origin лендинга —
+  // без <base> запросы за локально сохранёнными ресурсами клона уходят не
+  // туда. cloneId (несохранённый клон) важнее slug: при повторном
+  // клонировании существующей страницы предпросмотр должен показывать
+  // только что скачанные ресурсы, не ресурсы прежней сохранённой версии.
+  const previewBaseHref = cloneId
+    ? `/api/pages/clone-preview/${cloneId}/assets/`
+    : !isNew && slug
+      ? `/lp/${slug}/assets/`
+      : null
+  const previewHtml = previewBaseHref
+    ? /<head[^>]*>/i.test(htmlSource)
+      ? htmlSource.replace(/<head[^>]*>/i, (match) => `${match}<base href="${previewBaseHref}">`)
+      : `<base href="${previewBaseHref}">${htmlSource}`
+    : htmlSource
+
   return (
     <div className="flex min-h-0 flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -297,7 +314,7 @@ export default function PageEditorPage() {
             <div className="flex min-h-[400px] flex-1 items-start justify-center overflow-auto rounded-lg border bg-muted/30 p-3">
               <iframe
                 title="Предпросмотр учебной страницы"
-                srcDoc={htmlSource}
+                srcDoc={previewHtml}
                 // allow-same-origin сознательно опущен вместе с
                 // allow-scripts — предпросматриваемый HTML может быть
                 // произвольным (ручной ввод или результат граббера),

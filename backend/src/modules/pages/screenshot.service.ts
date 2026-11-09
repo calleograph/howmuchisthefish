@@ -141,6 +141,12 @@ export class ScreenshotService {
     return join(storageRoot, 'landing-assets', pageId, filename);
   }
 
+  /** Раздача ассета ДО сохранения страницы — см. pages.controller.ts clonePreviewAsset(). */
+  tmpClonedAssetPath(cloneId: string, filename: string): string {
+    const storageRoot = this.config.get<string>('STORAGE_ROOT', '/data/storage');
+    return join(storageRoot, 'landing-assets', `tmp-${cloneId}`, filename);
+  }
+
   async deleteAssets(pageId: string): Promise<void> {
     const storageRoot = this.config.get<string>('STORAGE_ROOT', '/data/storage');
     await rm(join(storageRoot, 'landing-assets', pageId), { recursive: true, force: true });
