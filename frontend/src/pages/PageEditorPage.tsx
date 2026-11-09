@@ -162,10 +162,12 @@ export default function PageEditorPage() {
   // туда. cloneId (несохранённый клон) важнее slug: при повторном
   // клонировании существующей страницы предпросмотр должен показывать
   // только что скачанные ресурсы, не ресурсы прежней сохранённой версии.
+  // БЕЗ хвостового "assets/" — сам HTML уже ссылается на "assets/{filename}"
+  // (так screenshot-service переписывает href/src), иначе путь дублируется.
   const previewBaseHref = cloneId
-    ? `/api/pages/clone-preview/${cloneId}/assets/`
+    ? `/api/pages/clone-preview/${cloneId}/`
     : !isNew && slug
-      ? `/lp/${slug}/assets/`
+      ? `/lp/${slug}/`
       : null
   const previewHtml = previewBaseHref
     ? /<head[^>]*>/i.test(htmlSource)
