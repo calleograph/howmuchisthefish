@@ -1,4 +1,4 @@
-# Security Awareness Platform — Docker Compose (базовая конфигурация).
+# HowMuchIsTheFish — Docker Compose (базовая конфигурация).
 #
 # Обязательные переменные без значений по умолчанию (см. .env.example) — если
 # не заданы, compose откажется стартовать, а не тихо захватит порт/откроет
@@ -33,7 +33,7 @@ services:
     # Никогда не публикуется на хост — доступен только внутри сети compose.
 
   backend:
-    image: ${BACKEND_IMAGE:-security-awareness-platform-backend:local}
+    image: ${BACKEND_IMAGE:-howmuchisthefish-backend:local}
     build:
       context: ../backend
     restart: unless-stopped
@@ -73,7 +73,7 @@ services:
     cpu_shares: 1024
 
   frontend:
-    image: ${FRONTEND_IMAGE:-security-awareness-platform-frontend:local}
+    image: ${FRONTEND_IMAGE:-howmuchisthefish-frontend:local}
     build:
       context: ../frontend
     restart: unless-stopped

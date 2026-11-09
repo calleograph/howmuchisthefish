@@ -1,4 +1,4 @@
-# Frontend — Security Awareness Platform
+# Frontend — HowMuchIsTheFish
 
 React + TypeScript + Vite + Tailwind CSS v4 + shadcn/ui. См. корневой
 [README.md](../README.md) проекта для общей картины.

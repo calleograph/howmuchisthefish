@@ -27,7 +27,7 @@ async function bootstrap() {
   });
 
   const config = new DocumentBuilder()
-    .setTitle('Security Awareness Platform API')
+    .setTitle('HowMuchIsTheFish API')
     .setDescription('REST API для управления учебными фишинговыми кампаниями')
     .setVersion('0.1.0')
     .addBearerAuth()

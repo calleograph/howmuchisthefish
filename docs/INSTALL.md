@@ -8,8 +8,8 @@
 ## Установка с нуля
 
 ```bash
-git clone <url-репозитория> security-awareness-platform
-cd security-awareness-platform
+git clone <url-репозитория> howmuchisthefish
+cd howmuchisthefish
 ./scripts/install.sh
 ```
 

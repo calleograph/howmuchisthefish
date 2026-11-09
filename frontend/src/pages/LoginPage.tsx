@@ -36,7 +36,7 @@ export default function LoginPage() {
           <div className="flex items-center gap-2">
             <ShieldCheck className="size-6 text-primary" />
             <div>
-              <CardTitle>Security Awareness Platform</CardTitle>
+              <CardTitle>HowMuchIsTheFish</CardTitle>
               <CardDescription>Вход в панель администратора</CardDescription>
             </div>
           </div>

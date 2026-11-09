@@ -34,7 +34,7 @@
 
 ```bash
 # Ежедневно в 03:00, хранить последние 14 копий
-0 3 * * * cd /opt/security-awareness-platform && ./scripts/backup.sh --keep 14 >> /var/log/sap-backup.log 2>&1
+0 3 * * * cd /opt/howmuchisthefish && ./scripts/backup.sh --keep 14 >> /var/log/sap-backup.log 2>&1
 ```
 
 ## Восстановление

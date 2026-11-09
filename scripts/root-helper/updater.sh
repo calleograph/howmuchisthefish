@@ -20,7 +20,7 @@ DEPLOY_DIR="$PROJECT_ROOT/deployment"
 # backend/Dockerfile) пишет сюда, root-служба читает. Права 1777 (sticky bit)
 # — любой может создать файл, но удалить только владелец или root, что не
 # даёт одному процессу удалить/подменить запрос другого раньше обработки.
-EXCHANGE_DIR="${SAP_EXCHANGE_DIR:-/var/lib/security-awareness-platform/updater}"
+EXCHANGE_DIR="${SAP_EXCHANGE_DIR:-/var/lib/howmuchisthefish/updater}"
 REQUEST_FILE="$EXCHANGE_DIR/request.json"
 RESULT_FILE="$EXCHANGE_DIR/result.json"
 LOG_FILE="$EXCHANGE_DIR/updater.log"

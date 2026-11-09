@@ -7,7 +7,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 DEPLOY_DIR="$PROJECT_ROOT/deployment"
-EXCHANGE_DIR="${SAP_EXCHANGE_DIR:-/var/lib/security-awareness-platform/updater}"
+EXCHANGE_DIR="${SAP_EXCHANGE_DIR:-/var/lib/howmuchisthefish/updater}"
 
 log() { echo "[$(date -Is)] $1" >&2; }
 

@@ -1,5 +1,5 @@
 [Unit]
-Description=Security Awareness Platform — root-helper для обновлений (один проход)
+Description=HowMuchIsTheFish — root-helper для обновлений (один проход)
 After=docker.service
 Requires=docker.service
 
@@ -7,8 +7,8 @@ Requires=docker.service
 Type=oneshot
 User=root
 # Путь подставляется установщиком при копировании unit-файла в /etc/systemd/system/.
-ExecStart=/opt/security-awareness-platform/scripts/root-helper/updater.sh
-Environment=SAP_EXCHANGE_DIR=/var/lib/security-awareness-platform/updater
+ExecStart=/opt/howmuchisthefish/scripts/root-helper/updater.sh
+Environment=SAP_EXCHANGE_DIR=/var/lib/howmuchisthefish/updater
 
 # Белый список действий внутри updater.sh — это вторая линия защиты; первая —
 # то, что служба вообще ничего не делает без лежащего в каталоге обмена

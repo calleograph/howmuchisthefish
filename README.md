@@ -1,4 +1,4 @@
-# Security Awareness Platform
+# HowMuchIsTheFish
 
 Открытый self-hosted инструмент для контролируемых учебных фишинговых
 рассылок, проверки осведомлённости сотрудников и оценки устойчивости к
@@ -22,8 +22,8 @@
 ## Быстрый старт
 
 ```bash
-git clone <url-репозитория> security-awareness-platform
-cd security-awareness-platform
+git clone <url-репозитория> howmuchisthefish
+cd howmuchisthefish
 ./scripts/install.sh
 ```
 

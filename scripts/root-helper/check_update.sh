@@ -7,8 +7,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-REPO="${SAP_GITHUB_REPO:-ORG/security-awareness-platform}" # заменяется при публикации
-EXCHANGE_DIR="${SAP_EXCHANGE_DIR:-/var/lib/security-awareness-platform/updater}"
+REPO="${SAP_GITHUB_REPO:-calleograph/howmuchisthefish}"
+EXCHANGE_DIR="${SAP_EXCHANGE_DIR:-/var/lib/howmuchisthefish/updater}"
 
 current_version=$(cat "$PROJECT_ROOT/VERSION" 2>/dev/null || echo "unknown")
 

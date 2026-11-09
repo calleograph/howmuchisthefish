@@ -107,7 +107,7 @@ export class SmtpConfigService {
       await transport.sendMail({
         from: config.fromAddress,
         to: toAddress,
-        subject: 'Security Awareness Platform — проверка SMTP-подключения',
+        subject: 'HowMuchIsTheFish — проверка SMTP-подключения',
         text: 'Если вы получили это письмо, SMTP-подключение настроено верно.',
       });
       await this.prisma.smtpConfig.update({

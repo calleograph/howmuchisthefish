@@ -1,4 +1,4 @@
-# Backend — Security Awareness Platform
+# Backend — HowMuchIsTheFish
 
 NestJS-приложение (модульный монолит). См. корневой [README.md](../README.md)
 проекта и [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) для общей картины.

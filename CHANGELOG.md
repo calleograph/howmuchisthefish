@@ -3,6 +3,16 @@
 Формат на основе [Keep a Changelog](https://keepachangelog.com/ru/1.0.0/),
 версии по [Semantic Versioning](https://semver.org/lang/ru/).
 
+## [Unreleased]
+
+### Изменено
+
+- Проект переименован: Security Awareness Platform → HowMuchIsTheFish.
+  Репозиторий на GitHub переехал на новый URL (GitHub сохраняет редирект со
+  старого). Новые Docker-образы в GHCR публикуются под именами
+  `howmuchisthefish-backend`/`howmuchisthefish-frontend`; образы релиза
+  v0.1.0 остаются в GHCR под прежним именем как исторический артефакт.
+
 ## [0.1.0] — первый выпуск
 
 Первая рабочая версия Security Awareness Platform — платформы для

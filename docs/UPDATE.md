@@ -17,7 +17,7 @@
 ## Вручную, из командной строки
 
 ```bash
-cd security-awareness-platform
+cd howmuchisthefish
 git fetch --tags
 git checkout v0.2.0   # нужная версия
 cd deployment

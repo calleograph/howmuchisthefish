@@ -1,4 +1,4 @@
-// Security Awareness Platform — схема данных.
+// HowMuchIsTheFish — схема данных.
 //
 // Соглашение о комментариях-политиках бэкапа (см. docs/BACKUP_RESTORE.md,
 // src/modules/admin/config-registry.ts): каждое поле, которое войдёт в экспорт
