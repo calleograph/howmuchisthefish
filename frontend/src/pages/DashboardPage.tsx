@@ -11,6 +11,7 @@ import {
   Users,
   Megaphone,
   ShieldCheck,
+  KeyRound,
 } from 'lucide-react'
 
 interface Overview {
@@ -18,7 +19,14 @@ interface Overview {
   totalEmployees: number
   totalGroups: number
   firstCampaignAt: string | null
-  events: { sent: number; opened: number; clicked: number; submitted: number; reportedPhishing: number }
+  events: {
+    sent: number
+    opened: number
+    clicked: number
+    submitted: number
+    reportedPhishing: number
+    compromised: number
+  }
 }
 
 interface TimelinePoint {
@@ -69,7 +77,7 @@ export default function DashboardPage() {
 
       <div>
         <h2 className="mb-3 text-lg font-semibold">События кампаний</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           <StatCard title="Отправлено" value={data?.events.sent} icon={Mail} loading={isLoading} />
           <StatCard title="Открыто" value={data?.events.opened} icon={MailOpen} loading={isLoading} />
           <StatCard
@@ -84,6 +92,16 @@ export default function DashboardPage() {
             icon={FileWarning}
             loading={isLoading}
             tone="warning"
+          />
+          {/* "Скомпрометировано" = уникальные сотрудники, введшие данные
+              формы (не количество попыток) — факт ввода, не проверенная
+              реальная компрометация (это задача безопасников, не отчёта). */}
+          <StatCard
+            title="Ввели пароль (скомпрометировано)"
+            value={data?.events.compromised}
+            icon={KeyRound}
+            loading={isLoading}
+            tone="danger"
           />
           {/* Положительная метрика (в отличие от остальных — чем выше, тем
               лучше): сотрудник сам распознал подозрительное письмо. */}
@@ -159,14 +177,16 @@ function StatCard({
   value?: number
   icon: React.ElementType
   loading: boolean
-  tone?: 'warning' | 'success'
+  tone?: 'warning' | 'success' | 'danger'
 }) {
   const iconClass =
     tone === 'warning'
       ? 'size-4 text-warning'
       : tone === 'success'
         ? 'size-4 text-success'
-        : 'size-4 text-muted-foreground'
+        : tone === 'danger'
+          ? 'size-4 text-destructive'
+          : 'size-4 text-muted-foreground'
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">

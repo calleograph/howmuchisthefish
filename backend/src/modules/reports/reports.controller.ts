@@ -19,6 +19,16 @@ export class ReportsController {
     return this.reports.byEmployee();
   }
 
+  // Полная история конкретного сотрудника по всем кампаниям — "кто какое
+  // действие совершил, что не совершил, точный IP/браузер" для отчёта
+  // руководителю. НЕ включает расшифрованные значения паролей (только их
+  // количество/варианты по хешу) — для этого отдельный ADMIN-only reveal в
+  // EventsController.
+  @Get('employees/:id/detail')
+  employeeDetail(@Param('id') id: string) {
+    return this.reports.employeeDetail(id);
+  }
+
   @Get('by-group')
   byGroup() {
     return this.reports.byGroup();

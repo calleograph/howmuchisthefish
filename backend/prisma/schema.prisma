@@ -169,9 +169,15 @@ model LandingPage {
   id             String   @id @default(uuid())
   name           String   // @policy:data
   slug           String   @unique // @policy:data — публичный путь /lp/{slug}
-  htmlSource     String   // @policy:data — HTML учебной страницы (из конструктора или ручной правки)
+  htmlSource     String   // @policy:data — HTML учебной страницы (из конструктора, граббера или ручной правки)
   formEnabled    Boolean  @default(false) // @policy:data
+  // Явный opt-in за каждую страницу (не глобальная настройка): сохранять ли
+  // зашифрованные значения полей при form_submitted, для проверки факта
+  // реальной компрометации. По умолчанию выключено — большинству учебных
+  // кампаний нужен только факт отправки, не содержимое. См. SECURITY.md.
+  capturesCredentials Boolean @default(false) // @policy:data
   screenshotPath String?  // @policy:data — путь в storage к превью-скриншоту (генерируется при сохранении)
+  sourceUrl      String?  // @policy:data — исходный URL, если страница получена граббером (для аудита происхождения)
   isArchived     Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -248,9 +254,16 @@ model CampaignTarget {
   @@map("campaign_targets")
 }
 
-// Критическое требование безопасности (задание §5, §2.5): здесь НИКОГДА не появится поле
-// для значений, введённых в форму учебной страницы (логин/пароль и т.п.). Схема рассчитана
-// только на факт события. См. docs/SECURITY.md "Почему нет поля form_data".
+// РЕШЕНИЕ ПЕРЕСМОТРЕНО (v0.3.0, по явному запросу владельца продукта — см.
+// docs/SECURITY.md "История решения о значениях форм"): раньше здесь был
+// комментарий "здесь НИКОГДА не появится поле для значений формы". Теперь
+// CampaignEvent по-прежнему НЕ хранит значения — факт остаётся фактом
+// события без полезной нагрузки, — но связанное значение (если это
+// FORM_SUBMITTED с паролем) может существовать ОТДЕЛЬНО в CapturedCredential,
+// зашифрованным, с collection-ключом не из общего APP_MASTER_KEY/окружения
+// приложения, доступным только через явный audit-logged reveal. Это
+// осознанный компромисс, не исходная гарантия "невозможно даже при
+// компрометации сервера целиком" — см. docs/SECURITY.md для полного разбора.
 model CampaignEvent {
   id          String            @id @default(uuid())
   campaignId  String
@@ -259,12 +272,33 @@ model CampaignEvent {
   target      CampaignTarget    @relation(fields: [targetId], references: [id], onDelete: Cascade)
   type        CampaignEventType // @policy:data
   isSuspiciousAutomated Boolean @default(false) // @policy:data — похоже на сканер/почтовый клиент, не на человека
-  userAgent   String?           // @policy:data — для классификации сканеров, не для идентификации человека
-  ipAddress   String?           // @policy:data — усечённый/опционально отключаемый, см. SECURITY.md retention
+  userAgent   String?           // @policy:data — точный User-Agent браузера, доступно без отдельного согласия (стандартный HTTP-заголовок)
+  ipAddress   String?           // @policy:data — точный IP, как получает его сервер (внешний/NAT-адрес клиента)
   createdAt   DateTime          @default(now())
+
+  credential  CapturedCredential?
 
   @@index([campaignId, type])
   @@map("campaign_events")
+}
+
+// Зашифрованное значение, введённое в форму учебной страницы — ТОЛЬКО для
+// FORM_SUBMITTED-событий, и только если задача кампании явно требует
+// проверки факта реальной компрометации (не хранится по умолчанию для
+// любой учебной страницы — см. LandingPage.capturesCredentials).
+// Ключ шифрования НЕ в APP_MASTER_KEY/основном .env — отдельный секрет,
+// см. CryptoService.encryptCredential(). Чтение — только через явный
+// reveal-эндпоинт с ролью ADMIN и обязательной записью в AuditLog.
+model CapturedCredential {
+  id          String        @id @default(uuid())
+  eventId     String        @unique
+  event       CampaignEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  fieldName   String        // @policy:data — имя поля формы (login/password/email и т.п.), не секрет само по себе
+  valueEnc    String        // @policy:reset — AES-256-GCM, отдельный ключ (CREDENTIAL_ENCRYPTION_KEY, не APP_MASTER_KEY) — без исходного ключа на новом сервере не восстановить, см. SECURITY.md
+  valueHash   String        // @policy:hash — SHA-256 от исходного значения, для дедупликации БЕЗ расшифровки (см. "варианты ввода")
+  createdAt   DateTime      @default(now())
+
+  @@map("captured_credentials")
 }
 
 model AuditLog {

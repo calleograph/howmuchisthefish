@@ -28,7 +28,11 @@ import { MaintenanceModule } from './modules/admin/maintenance/maintenance.modul
       pinoHttp: {
         level: process.env.LOG_LEVEL ?? 'info',
         // structured JSON logs — задание §4/§8: никогда не логировать пароли/токены/поля форм.
-        redact: ['req.headers.authorization', 'req.body.password'],
+        // req.body.fields целиком (не отдельные под-ключи — pino redact не
+        // поддерживает wildcard внутри массива объектов произвольной формы)
+        // редактируется из-за POST /t/credential (CredentialSubmitDto.fields) —
+        // единственное место в API, принимающее значения полей учебной формы.
+        redact: ['req.headers.authorization', 'req.body.password', 'req.body.fields'],
       },
     }),
     ThrottlerModule.forRootAsync({

@@ -42,7 +42,7 @@ async function bootstrap() {
   const config = new DocumentBuilder()
     .setTitle('HowMuchIsTheFish API')
     .setDescription('REST API для управления учебными фишинговыми кампаниями')
-    .setVersion('0.2.0')
+    .setVersion('0.3.0')
     .addBearerAuth()
     .build();
   const document = SwaggerModule.createDocument(app, config);

@@ -307,7 +307,7 @@ export class CampaignsService {
 
   async stats(id: string) {
     await this.get(id);
-    const [sent, opened, clicked, submitted, reportedPhishing, total] = await Promise.all([
+    const [sent, opened, clicked, submitted, reportedPhishing, total, compromised] = await Promise.all([
       this.prisma.campaignEvent.count({
         where: { campaignId: id, type: 'EMAIL_SENT' },
       }),
@@ -326,8 +326,14 @@ export class CampaignsService {
         where: { campaignId: id, type: 'REPORTED_PHISHING' },
       }),
       this.prisma.campaignTarget.count({ where: { campaignId: id } }),
+      // Уникальные цели, реально введшие данные формы (не количество
+      // событий/попыток) — см. ReportsService.overview() для той же логики
+      // на уровне всех кампаний.
+      this.prisma.campaignTarget.count({
+        where: { campaignId: id, events: { some: { credential: { isNot: null } } } },
+      }),
     ]);
-    return { totalTargets: total, sent, opened, clicked, submitted, reportedPhishing };
+    return { totalTargets: total, sent, opened, clicked, submitted, reportedPhishing, compromised };
   }
 
   private async assertTemplateExists(id: string) {

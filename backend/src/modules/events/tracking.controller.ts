@@ -12,7 +12,7 @@ import { ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { Public } from '../auth/public.decorator';
 import { EventsService } from './events.service';
-import { TrackEventDto } from './dto/track-event.dto';
+import { TrackEventDto, CredentialSubmitDto } from './dto/track-event.dto';
 
 /**
  * Публичные (без JWT) роуты, встроенные в письма/учебные страницы. Префикс /t
@@ -53,6 +53,22 @@ export class TrackingController {
     return this.events.record({
       token: dto.token,
       type: dto.type,
+      userAgent: req.headers['user-agent'],
+      ipAddress: req.ip,
+    });
+  }
+
+  // Используется ТОЛЬКО buildCapturingFormScript (страница с явно включённым
+  // LandingPage.capturesCredentials) — отдельный от /t/event путь, т.к.
+  // полезная нагрузка здесь содержит значения полей формы. Шифруются
+  // немедленно в EventsService.recordCredentials, не логируются как есть
+  // (см. main.ts redact для req.body — добавить при необходимости поле fields).
+  @Post('credential')
+  @Header('Cache-Control', 'no-store')
+  async credential(@Body() dto: CredentialSubmitDto, @Req() req: Request) {
+    return this.events.recordCredentials({
+      token: dto.token,
+      fields: dto.fields,
       userAgent: req.headers['user-agent'],
       ipAddress: req.ip,
     });

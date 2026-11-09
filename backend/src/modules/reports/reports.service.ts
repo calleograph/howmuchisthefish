@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
@@ -7,7 +7,7 @@ export class ReportsService {
 
   /** Общая статистика по всем кампаниям (для главной панели). */
   async overview() {
-    const [totalCampaigns, totalEmployees, totalGroups, eventCounts, firstCampaign] =
+    const [totalCampaigns, totalEmployees, totalGroups, eventCounts, firstCampaign, compromisedTargets] =
       await Promise.all([
         this.prisma.campaign.count(),
         this.prisma.employee.count({ where: { isActive: true } }),
@@ -18,6 +18,13 @@ export class ReportsService {
         // пустой график из нулей за "текущий месяц", если все данные были
         // раньше. Найдено как UX-проблема у донора: жёсткий недефолт.
         this.prisma.campaign.findFirst({ orderBy: { createdAt: 'asc' }, select: { createdAt: true } }),
+        // "Скомпрометирован" = ввёл хотя бы одно значение формы на странице с
+        // включённым захватом — считаем ЦЕЛЬ один раз, не количество событий
+        // (сотрудник, подобравший 3 варианта пароля подряд, всё равно один
+        // человек, не три инцидента). distinct по targetId через группировку.
+        this.prisma.campaignTarget.count({
+          where: { events: { some: { credential: { isNot: null } } } },
+        }),
       ]);
     const byType: Record<string, number> = {};
     for (const row of eventCounts) byType[row.type] = row._count;
@@ -33,6 +40,11 @@ export class ReportsService {
         clicked: byType.LINK_CLICKED ?? 0,
         submitted: byType.FORM_SUBMITTED ?? 0,
         reportedPhishing: byType.REPORTED_PHISHING ?? 0,
+        // Честно НЕ "проверенная реальная компрометация" (как и просил
+        // пользователь — на этапе отчёта не перепроверяем, реально ли пароль
+        // совпадает с рабочим), а факт: сотрудник ввёл значение в форму с
+        // включённым захватом. Терминология в UI — "ввели данные формы".
+        compromised: compromisedTargets,
       },
     };
   }
@@ -84,6 +96,92 @@ export class ReportsService {
       byEmployee.set(key, entry);
     }
     return [...byEmployee.values()].sort((a, b) => b.submitted - a.submitted);
+  }
+
+  /**
+   * Полная история конкретного сотрудника по всем кампаниям — для отчёта
+   * руководителю: какие действия совершены/не совершены, точный IP/браузер
+   * каждого события, количество УНИКАЛЬНЫХ вариантов введённого пароля
+   * (по хешу, значения НЕ возвращаются — для них отдельный reveal-эндпоинт
+   * с ADMIN-ролью и audit-логом, см. EventsController.reveal).
+   */
+  async employeeDetail(employeeId: string) {
+    const employee = await this.prisma.employee.findUnique({
+      where: { id: employeeId },
+      include: { groups: { include: { group: true } } },
+    });
+    if (!employee) throw new NotFoundException('Сотрудник не найден');
+
+    const targets = await this.prisma.campaignTarget.findMany({
+      where: { employeeId },
+      include: {
+        campaign: { select: { id: true, name: true, status: true } },
+        events: {
+          orderBy: { createdAt: 'asc' },
+          include: { credential: { select: { id: true, fieldName: true, valueHash: true, createdAt: true } } },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const campaigns = targets.map((target) => {
+      const byType = new Map<string, (typeof target.events)[number]>();
+      for (const ev of target.events) {
+        // Первое событие каждого типа — момент, когда действие впервые
+        // произошло (достаточно для "что совершил / когда", не нужен весь
+        // поток кликов одного типа ради этого отчёта).
+        if (!byType.has(ev.type)) byType.set(ev.type, ev);
+      }
+
+      const ALL_TYPES = ['EMAIL_SENT', 'EMAIL_OPENED', 'LINK_CLICKED', 'FORM_SUBMITTED', 'REPORTED_PHISHING'];
+      const actions = ALL_TYPES.map((type) => {
+        const ev = byType.get(type);
+        return {
+          type,
+          occurred: !!ev,
+          at: ev?.createdAt ?? null,
+          ipAddress: ev?.ipAddress ?? null,
+          userAgent: ev?.userAgent ?? null,
+          isSuspiciousAutomated: ev?.isSuspiciousAutomated ?? null,
+        };
+      });
+
+      // Уникальные варианты пароля за ВСЕ submit этой кампании-цели (дедуп
+      // по valueHash уже на уровне записи в БД — здесь просто считаем группы).
+      const uniqueCredentials = new Map<
+        string,
+        { fieldName: string; valueHash: string; firstSeenAt: Date; eventId: string }
+      >();
+      for (const ev of target.events) {
+        if (!ev.credential) continue;
+        if (!uniqueCredentials.has(ev.credential.valueHash)) {
+          uniqueCredentials.set(ev.credential.valueHash, {
+            fieldName: ev.credential.fieldName,
+            valueHash: ev.credential.valueHash,
+            firstSeenAt: ev.credential.createdAt,
+            eventId: ev.id,
+          });
+        }
+      }
+
+      return {
+        campaignId: target.campaign.id,
+        campaignName: target.campaign.name,
+        campaignStatus: target.campaign.status,
+        actions,
+        capturedVariants: [...uniqueCredentials.values()],
+      };
+    });
+
+    return {
+      employeeId: employee.id,
+      email: employee.email,
+      fullName: `${employee.firstName} ${employee.lastName}`,
+      department: employee.department,
+      position: employee.position,
+      groups: employee.groups.map((g) => g.group.name),
+      campaigns,
+    };
   }
 
   /** Срез по группам — усреднённая "уязвимость" (доля попавшихся) по группе. */

@@ -46,6 +46,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:?Задайте JWT_SECRET в .env (openssl rand -hex 32)}
       JWT_EXPIRES_IN: 24h
       APP_MASTER_KEY: ${APP_MASTER_KEY:?Задайте APP_MASTER_KEY в .env (openssl rand -hex 32)}
+      CREDENTIAL_ENCRYPTION_KEY: ${CREDENTIAL_ENCRYPTION_KEY:-}
       STORAGE_ROOT: /data/storage
       LOG_LEVEL: ${LOG_LEVEL:-info}
       RATE_LIMIT_TTL_SECONDS: 60

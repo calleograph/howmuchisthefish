@@ -15,7 +15,7 @@ import { createReadStream, existsSync } from 'fs';
 import { join } from 'path';
 import { Roles } from '../auth/roles.decorator';
 import { PagesService } from './pages.service';
-import { CreatePageDto, UpdatePageDto } from './dto/page.dto';
+import { CreatePageDto, UpdatePageDto, CloneUrlDto } from './dto/page.dto';
 
 @ApiTags('pages')
 @ApiBearerAuth()
@@ -50,6 +50,17 @@ export class PagesController {
   @Post()
   create(@Body() dto: CreatePageDto) {
     return this.pages.create(dto);
+  }
+
+  // Граббер страниц: получает готовый HTML по URL (headless-рендер, не
+  // просто curl — работает для SPA), НЕ сохраняет страницу сразу —
+  // администратор видит результат в редакторе и сам решает, сохранять ли,
+  // прежде чем он станет реальным лендингом кампании. См. docs/SECURITY.md
+  // "Граббер страниц" про ограничения (CSP/anti-cloning/authwalled сайты).
+  @Roles('ADMIN', 'EDITOR')
+  @Post('clone-preview')
+  clonePreview(@Body() dto: CloneUrlDto) {
+    return this.pages.clonePreview(dto.url);
   }
 
   @Roles('ADMIN', 'EDITOR')

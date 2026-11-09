@@ -58,6 +58,17 @@ export const CONFIG_REGISTRY: ConfigFieldEntry[] = [
   { model: 'Setting', field: '*', policy: 'data' }, // политика по конкретному key — см. SETTINGS_POLICY ниже
   { model: 'Backup', field: '*', policy: 'data' }, // сама запись о бэкапе, не его содержимое
   { model: 'CustomFieldDef', field: '*', policy: 'data' }, // схема доп. полей сотрудников — не их значения
+
+  // CapturedCredential — зашифрован отдельным от APP_MASTER_KEY ключом
+  // (CREDENTIAL_ENCRYPTION_KEY, см. CryptoService), поэтому НЕ @policy:secret
+  // в обычном смысле (export/import через config-registry работает с
+  // APP_MASTER_KEY-шифрованием). Явная политика 'reset' для valueEnc: при
+  // восстановлении из бэкапа на другом сервере без исходного
+  // CREDENTIAL_ENCRYPTION_KEY значение всё равно не расшифровать — честнее
+  // пометить как не переносимое, чем притворяться 'secret'.
+  { model: 'CapturedCredential', field: 'fieldName', policy: 'data' },
+  { model: 'CapturedCredential', field: 'valueEnc', policy: 'reset' },
+  { model: 'CapturedCredential', field: 'valueHash', policy: 'hash' },
 ];
 
 /**

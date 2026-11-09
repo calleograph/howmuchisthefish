@@ -29,6 +29,63 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === 'POST' && req.url === '/clone') {
+    let body = '';
+    req.on('data', (chunk) => (body += chunk));
+    req.on('end', async () => {
+      try {
+        const { url } = JSON.parse(body);
+        if (!url || typeof url !== 'string') {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Поле url обязательно' }));
+          return;
+        }
+        let parsed;
+        try {
+          parsed = new URL(url);
+        } catch {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Некорректный URL' }));
+          return;
+        }
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Поддерживаются только http/https' }));
+          return;
+        }
+
+        const browser = await getBrowser();
+        const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+        try {
+          // networkidle, не domcontentloaded — страница должна полностью
+          // дорендериться (SPA с формой входа, подгружаемой через JS), иначе
+          // клонируем пустой корневой div вместо реальной формы.
+          await page.goto(url, { waitUntil: 'networkidle', timeout: 20000 });
+          // <base href> переписывает относительные пути ресурсов (css/js/img)
+          // на абсолютные с оригинального домена — простой и надёжный подход
+          // для первой реализации (не требует скачивать и зеркалировать
+          // каждый ресурс на диск); у исходного сайта ресурсы продолжат
+          // отдаваться напрямую, пока он жив — известное ограничение,
+          // задокументированное в SECURITY.md/CONFIGURATION.md.
+          await page.evaluate((baseUrl) => {
+            const base = document.createElement('base');
+            base.href = baseUrl;
+            document.head.prepend(base);
+          }, parsed.origin + parsed.pathname.replace(/[^/]*$/, ''));
+          const html = await page.content();
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ html }));
+        } finally {
+          await page.close();
+        }
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: String(err) }));
+      }
+    });
+    return;
+  }
+
   if (req.method === 'POST' && req.url === '/screenshot') {
     let body = '';
     req.on('data', (chunk) => (body += chunk));

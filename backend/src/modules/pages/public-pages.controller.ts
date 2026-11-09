@@ -5,7 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { Public } from '../auth/public.decorator';
 import { PagesService } from './pages.service';
 import { EventsService } from '../events/events.service';
-import { buildSafeFormScript } from './safe-form-injector';
+import { buildCapturingFormScript, buildSafeFormScript } from './safe-form-injector';
 
 /**
  * Публичная раздача учебных страниц по адресу /lp/{slug}?token={trackingToken}.
@@ -46,10 +46,13 @@ export class PublicPagesController {
         // Скрипт всегда шлёт link_clicked при загрузке; слушатель submit вешается
         // независимо от formEnabled — лишний обработчик без формы на странице не
         // сработает, но так проще, чем условно генерировать разный JS.
-        const script = buildSafeFormScript(
-          token,
-          this.config.get<string>('PUBLIC_BASE_URL', ''),
-        );
+        // Выбор между безопасным и захватывающим скриптом — единственное место
+        // в коде, где решается, читать ли значения формы: явный флаг страницы,
+        // не глобальная настройка. См. safe-form-injector.ts.
+        const publicBaseUrl = this.config.get<string>('PUBLIC_BASE_URL', '');
+        const script = page.capturesCredentials
+          ? buildCapturingFormScript(token, publicBaseUrl)
+          : buildSafeFormScript(token, publicBaseUrl);
         html = injectBeforeBodyEnd(html, script);
       }
     }

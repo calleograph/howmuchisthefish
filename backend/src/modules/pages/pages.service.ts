@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { ScreenshotService } from './screenshot.service';
 import { CreatePageDto, UpdatePageDto } from './dto/page.dto';
+import { rewriteFormsForCapture } from './form-rewriter';
 
 @Injectable()
 export class PagesService {
@@ -65,15 +66,37 @@ export class PagesService {
         slug: dto.slug,
         htmlSource: dto.htmlSource,
         formEnabled: dto.formEnabled ?? false,
+        capturesCredentials: dto.capturesCredentials ?? false,
+        sourceUrl: dto.sourceUrl,
       },
     });
     this.regenerateScreenshot(page.id, page.htmlSource);
     return page;
   }
 
+  // Граббер: только рендерит и готовит HTML для предпросмотра/редактирования,
+  // НЕ создаёт LandingPage — администратор сохраняет явно через create() после
+  // просмотра результата. rewriteFormsForCapture убирает оригинальный
+  // action/method формы (чтобы сетевой сбой JS-перехвата не отправил данные
+  // на реальный сайт) — сама логика трекинга добавляется позже, при раздаче
+  // через /lp/{slug} (см. public-pages.controller.ts), не здесь.
+  async clonePreview(url: string) {
+    const rawHtml = await this.screenshots.clone(url);
+    const htmlSource = rewriteFormsForCapture(rawHtml);
+    return { htmlSource, sourceUrl: url };
+  }
+
   async update(id: string, dto: UpdatePageDto) {
     await this.get(id);
-    const page = await this.prisma.landingPage.update({ where: { id }, data: dto });
+    const page = await this.prisma.landingPage.update({
+      where: { id },
+      data: {
+        name: dto.name,
+        htmlSource: dto.htmlSource,
+        formEnabled: dto.formEnabled,
+        capturesCredentials: dto.capturesCredentials,
+      },
+    });
     if (dto.htmlSource) this.regenerateScreenshot(page.id, page.htmlSource);
     return page;
   }

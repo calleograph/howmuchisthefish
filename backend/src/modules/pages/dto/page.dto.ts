@@ -3,6 +3,7 @@ import {
   IsBoolean,
   IsOptional,
   IsString,
+  IsUrl,
   Matches,
   MaxLength,
 } from 'class-validator';
@@ -32,6 +33,20 @@ export class CreatePageDto {
   @IsOptional()
   @IsBoolean()
   formEnabled?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Явный opt-in: сохранять зашифрованные значения полей формы для проверки факта компрометации. По умолчанию выключено.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  capturesCredentials?: boolean;
+
+  @ApiPropertyOptional({ description: 'Исходный URL, если страница получена граббером' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  sourceUrl?: string;
 }
 
 export class UpdatePageDto {
@@ -50,4 +65,16 @@ export class UpdatePageDto {
   @IsOptional()
   @IsBoolean()
   formEnabled?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  capturesCredentials?: boolean;
+}
+
+export class CloneUrlDto {
+  @ApiProperty({ description: 'URL страницы для клонирования (headless-рендер через screenshot-service)' })
+  @IsUrl({ protocols: ['http', 'https'], require_protocol: true })
+  @MaxLength(2000)
+  url!: string;
 }

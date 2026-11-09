@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Upload, Search, Plus, UsersRound, Users } from 'lucide-react'
 import { toast } from 'sonner'
+import { Link } from 'react-router-dom'
 import { CustomFieldsTab } from './employees/CustomFieldsTab'
 
 interface Employee {
@@ -147,9 +148,9 @@ export default function EmployeesPage() {
                 {data?.items.map((emp) => (
                   <TableRow key={emp.id}>
                     <TableCell>
-                      <div className="font-medium">
+                      <Link to={`/employees/${emp.id}`} className="font-medium hover:underline">
                         {emp.firstName} {emp.lastName}
-                      </div>
+                      </Link>
                       <div className="text-sm text-muted-foreground">{emp.email}</div>
                     </TableCell>
                     <TableCell>{emp.department ?? '—'}</TableCell>
