@@ -66,6 +66,12 @@ export class PagesController {
 
   // Отдаёт превью-скриншот, если он был сгенерирован (screenshot-service
   // запущен и успел обработать страницу) — 404, если скриншота ещё нет.
+  // @Public(): используется через <img src> в PagesPage.tsx — обычный
+  // ресурсный запрос браузера не несёт Authorization-заголовок (JWT
+  // только в localStorage), без этого картинка молча не грузилась (404 в
+  // консоли сети, 401 от guard'а). Сама HTML-страница и так публично
+  // раздаётся по /lp/:slug — превью не секретнее оригинала.
+  @Public()
   @Get(':id/screenshot')
   async screenshot(@Param('id') id: string, @Res() res: Response) {
     const page = await this.pages.get(id);

@@ -47,3 +47,20 @@ api.interceptors.response.use(
     return Promise.reject(error)
   },
 )
+
+/**
+ * Скачивание защищённого файла (CSV-экспорты и т.п.) — обычная ссылка
+ * <a href="/api/..."> не несёт Authorization-заголовок (JWT только в
+ * localStorage, не в cookie), запрос падает 401 раньше, чем браузер
+ * увидит файл. Запрашивает через тот же authenticated-клиент api и
+ * скачивает результат через Blob + временную ссылку.
+ */
+export async function downloadFile(path: string, filename: string) {
+  const response = await api.get(path, { responseType: 'blob' })
+  const url = URL.createObjectURL(response.data)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
+}

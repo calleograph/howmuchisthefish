@@ -1,16 +1,17 @@
 import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api } from '@/lib/api'
+import { api, downloadFile } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Card } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Upload, Search, Plus, UsersRound, Users } from 'lucide-react'
+import { Upload, Download, Search, Plus, UsersRound, Users, UserX } from 'lucide-react'
 import { toast } from 'sonner'
 import { Link } from 'react-router-dom'
 import { CustomFieldsTab } from './employees/CustomFieldsTab'
@@ -45,6 +46,7 @@ interface Group {
 
 export default function EmployeesPage() {
   const [search, setSearch] = useState('')
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
   const fileInput = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
 
@@ -76,10 +78,29 @@ export default function EmployeesPage() {
     onError: () => toast.error('Не удалось импортировать файл'),
   })
 
+  const bulkDeactivateMutation = useMutation({
+    mutationFn: (employeeIds: string[]) => api.post('/employees/bulk/deactivate', { employeeIds }),
+    onSuccess: (_, employeeIds) => {
+      queryClient.invalidateQueries({ queryKey: ['employees'] })
+      toast.success(`Деактивировано: ${employeeIds.length}`)
+      setSelectedIds([])
+    },
+    onError: (err: any) => toast.error(err.response?.data?.message ?? 'Не удалось деактивировать выбранных'),
+  })
+
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (file) importMutation.mutate(file)
     e.target.value = ''
+  }
+
+  function toggleSelected(id: string, checked: boolean) {
+    setSelectedIds((prev) => (checked ? [...prev, id] : prev.filter((x) => x !== id)))
+  }
+  const allVisibleSelected = !!data?.items.length && data.items.every((e) => selectedIds.includes(e.id))
+  function toggleSelectAll(checked: boolean) {
+    if (!data) return
+    setSelectedIds(checked ? data.items.map((e) => e.id) : [])
   }
 
   return (
@@ -90,6 +111,10 @@ export default function EmployeesPage() {
           <p className="text-muted-foreground">Цели для учебных кампаний, группы, доп. поля</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={() => downloadFile('/employees/export.csv', 'employees.csv')}>
+            <Download className="size-4" />
+            Экспорт CSV
+          </Button>
           <input ref={fileInput} type="file" accept=".csv" hidden onChange={handleFileChange} />
           <Button onClick={() => fileInput.current?.click()} disabled={importMutation.isPending}>
             <Upload className="size-4" />
@@ -106,14 +131,37 @@ export default function EmployeesPage() {
         </TabsList>
 
         <TabsContent value="employees" className="flex flex-col gap-4">
-          <div className="relative max-w-[320px]">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Поиск по email или имени…"
-              className="pl-8"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative max-w-[320px]">
+              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Поиск по email или имени…"
+                className="pl-8"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            {selectedIds.length > 0 && (
+              <div className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2">
+                <span className="text-sm text-muted-foreground">Выбрано: {selectedIds.length}</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive hover:text-destructive"
+                  disabled={bulkDeactivateMutation.isPending}
+                  onClick={() => {
+                    if (
+                      confirm(`Деактивировать ${selectedIds.length} сотрудников? Их можно будет снова активировать позже.`)
+                    ) {
+                      bulkDeactivateMutation.mutate(selectedIds)
+                    }
+                  }}
+                >
+                  <UserX className="size-3.5" />
+                  Деактивировать
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* overflow-visible: Card по умолчанию overflow-hidden, что обрезало
@@ -124,6 +172,11 @@ export default function EmployeesPage() {
             <Table className="min-w-[640px]">
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <label className="flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center">
+                      <Checkbox checked={allVisibleSelected} onCheckedChange={(c) => toggleSelectAll(!!c)} />
+                    </label>
+                  </TableHead>
                   <TableHead>Сотрудник</TableHead>
                   <TableHead>Отдел</TableHead>
                   <TableHead>Группы</TableHead>
@@ -133,20 +186,28 @@ export default function EmployeesPage() {
               <TableBody>
                 {isLoading && (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground">
+                    <TableCell colSpan={5} className="text-center text-muted-foreground">
                       Загрузка…
                     </TableCell>
                   </TableRow>
                 )}
                 {!isLoading && data?.items.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground">
+                    <TableCell colSpan={5} className="text-center text-muted-foreground">
                       Сотрудники не найдены. Импортируйте список из CSV.
                     </TableCell>
                   </TableRow>
                 )}
                 {data?.items.map((emp) => (
                   <TableRow key={emp.id}>
+                    <TableCell>
+                      <label className="flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center">
+                        <Checkbox
+                          checked={selectedIds.includes(emp.id)}
+                          onCheckedChange={(c) => toggleSelected(emp.id, !!c)}
+                        />
+                      </label>
+                    </TableCell>
                     <TableCell>
                       <Link to={`/employees/${emp.id}`} className="font-medium hover:underline">
                         {emp.firstName} {emp.lastName}

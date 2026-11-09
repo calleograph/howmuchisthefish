@@ -1,6 +1,6 @@
 import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { api } from '@/lib/api'
+import { api, downloadFile } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Download } from 'lucide-react'
@@ -33,24 +33,24 @@ export default function CampaignDetailPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-semibold">{campaign?.name ?? 'Кампания'}</h1>
         <div className="flex gap-2">
+          {/* Были <a href="/api/..."> — обычная ссылка не несёт
+              Authorization-заголовок (JWT только в localStorage), запрос
+              падал 401 раньше, чем браузер видел файл. Найдено при работе
+              над экспортом сотрудников (тот же паттерн). */}
           <Button
             variant="outline"
-            render={
-              <a href={`/api/reports/campaigns/${id}/export-users.csv`} target="_blank" rel="noreferrer">
-                <Download className="size-4" />
-                Сводка по сотрудникам
-              </a>
-            }
-          />
+            onClick={() => downloadFile(`/reports/campaigns/${id}/export-users.csv`, `campaign-${id}-users.csv`)}
+          >
+            <Download className="size-4" />
+            Сводка по сотрудникам
+          </Button>
           <Button
             variant="outline"
-            render={
-              <a href={`/api/reports/campaigns/${id}/export.csv`} target="_blank" rel="noreferrer">
-                <Download className="size-4" />
-                Журнал событий
-              </a>
-            }
-          />
+            onClick={() => downloadFile(`/reports/campaigns/${id}/export.csv`, `campaign-${id}-events.csv`)}
+          >
+            <Download className="size-4" />
+            Журнал событий
+          </Button>
         </div>
       </div>
 

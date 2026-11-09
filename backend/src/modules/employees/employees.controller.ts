@@ -2,10 +2,12 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Param,
   Patch,
   Post,
   Query,
+  Res,
   UploadedFile,
   UseInterceptors,
   Request,
@@ -14,12 +16,15 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { Roles } from '../auth/roles.decorator';
 import { EmployeesService } from './employees.service';
 import { CsvImportService } from './csv-import.service';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
 import { BulkAssignGroupDto } from './dto/bulk-assign-group.dto';
+import { BulkEmployeeIdsDto } from './dto/bulk-employee-ids.dto';
+import { BulkUpdateFieldsDto } from './dto/bulk-update-fields.dto';
 
 @ApiTags('employees')
 @ApiBearerAuth()
@@ -43,6 +48,14 @@ export class EmployeesController {
       page,
       pageSize: Math.min(pageSize, 200),
     });
+  }
+
+  // Перед :id — иначе Nest принял бы "export.csv" за id сотрудника.
+  @Get('export.csv')
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  @Header('Content-Disposition', 'attachment; filename="employees.csv"')
+  async exportCsv(@Res() res: Response) {
+    res.send(await this.employees.exportCsv());
   }
 
   @Get(':id')
@@ -81,6 +94,19 @@ export class EmployeesController {
   @Post('bulk/assign-group')
   bulkAssignGroup(@Body() dto: BulkAssignGroupDto) {
     return this.employees.bulkAssignGroup(dto.employeeIds, dto.groupId);
+  }
+
+  @Roles('ADMIN', 'EDITOR')
+  @Post('bulk/deactivate')
+  bulkDeactivate(@Body() dto: BulkEmployeeIdsDto, @Request() req: any) {
+    return this.employees.bulkDeactivate(dto.employeeIds, req.user?.id ?? null);
+  }
+
+  @Roles('ADMIN', 'EDITOR')
+  @Post('bulk/update-fields')
+  bulkUpdateFields(@Body() dto: BulkUpdateFieldsDto, @Request() req: any) {
+    const { employeeIds, ...fields } = dto;
+    return this.employees.bulkUpdateFields(employeeIds, fields, req.user?.id ?? null);
   }
 
   @Roles('ADMIN', 'EDITOR')

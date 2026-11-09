@@ -171,10 +171,91 @@ export class EmployeesService {
     return { assigned: employeeIds.length };
   }
 
+  // Массовые операции кроме assign-group отсутствовали и в UI, и в API
+  // (docs/FUNCTIONAL_GAP_MATRIX.md §13) — тот же паттерн $transaction, что
+  // и bulkAssignGroup выше. Деактивация, не удаление: сотрудник остаётся
+  // в истории кампаний (CampaignTarget.employeeId), жёсткое удаление
+  // сломало бы отчётность по прошлым рассылкам.
+  async bulkDeactivate(employeeIds: string[], actorUserId: string | null) {
+    await this.prisma.$transaction([
+      this.prisma.employee.updateMany({
+        where: { id: { in: employeeIds } },
+        data: { isActive: false },
+      }),
+      this.prisma.employeeHistory.createMany({
+        data: employeeIds.map((employeeId) => ({
+          employeeId,
+          changedBy: actorUserId,
+          changeType: 'deactivated',
+          diff: {},
+        })),
+      }),
+    ]);
+    return { deactivated: employeeIds.length };
+  }
+
+  // customFields — произвольный JSON по ключам CustomFieldDef, значения
+  // приводятся к строке так же, как при персонализации писем
+  // (mailer-queue.service.ts) — тот же тип данных, та же проблема.
+  async bulkUpdateFields(
+    employeeIds: string[],
+    fields: { department?: string; position?: string; customFields?: Record<string, unknown> },
+    actorUserId: string | null,
+  ) {
+    if (fields.customFields) await this.validateCustomFields(fields.customFields);
+    const data: Prisma.EmployeeUpdateManyMutationInput = {};
+    if (fields.department !== undefined) data.department = fields.department;
+    if (fields.position !== undefined) data.position = fields.position;
+    if (fields.customFields !== undefined) {
+      data.customFields = fields.customFields as Prisma.InputJsonValue;
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.employee.updateMany({ where: { id: { in: employeeIds } }, data }),
+      this.prisma.employeeHistory.createMany({
+        data: employeeIds.map((employeeId) => ({
+          employeeId,
+          changedBy: actorUserId,
+          changeType: 'updated',
+          diff: fields as Prisma.InputJsonValue,
+        })),
+      }),
+    ]);
+    return { updated: employeeIds.length };
+  }
+
+  /** Экспорт сотрудников в CSV — симметрично импорту (csv-import.service.ts), те же колонки. */
+  async exportCsv(): Promise<string> {
+    const employees = await this.prisma.employee.findMany({
+      orderBy: { lastName: 'asc' },
+    });
+    const header = 'email,firstName,lastName,department,position,isActive\n';
+    const rows = employees
+      .map((e) =>
+        [
+          csvEscape(e.email),
+          csvEscape(e.firstName),
+          csvEscape(e.lastName),
+          csvEscape(e.department ?? ''),
+          csvEscape(e.position ?? ''),
+          e.isActive,
+        ].join(','),
+      )
+      .join('\n');
+    return header + rows;
+  }
+
   async history(employeeId: string) {
     return this.prisma.employeeHistory.findMany({
       where: { employeeId },
       orderBy: { createdAt: 'desc' },
     });
   }
+}
+
+function csvEscape(value: string): string {
+  if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
 }
