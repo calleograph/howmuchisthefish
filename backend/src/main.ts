@@ -17,7 +17,20 @@ async function bootstrap() {
       transform: true,
     }),
   );
-  app.enableCors({ origin: process.env.PUBLIC_BASE_URL, credentials: true });
+  // По умолчанию CORS открыт для любого origin — сервис должен пускать сразу
+  // после установки, с какого бы адреса к нему ни обращались (IP в локальной
+  // сети, домен, несколько адресов одновременно), без ошибок на первом
+  // входе из-за несовпадения origin. CORS_ALLOWED_ORIGINS — осознанный шаг
+  // ужесточения (список через запятую), который администратор включает
+  // позже, когда адреса доступа уже известны и стабильны (см. CONFIGURATION.md).
+  const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+  app.enableCors({
+    origin: allowedOrigins.length > 0 ? allowedOrigins : true,
+    credentials: true,
+  });
 
   // Префикс api/ для всего REST API администратора — отделяет его от публичных
   // встраиваемых в письма роутов (/lp/{slug}, /t/*) и от /health, которым префикс

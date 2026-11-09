@@ -42,6 +42,7 @@ services:
       PORT: 3000
       DATABASE_URL: postgresql://sap:${DB_PASSWORD:?Задайте DB_PASSWORD в .env}@postgres:5432/sap
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?Задайте PUBLIC_BASE_URL в .env (https://ваш-домен)}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
       JWT_SECRET: ${JWT_SECRET:?Задайте JWT_SECRET в .env (openssl rand -hex 32)}
       JWT_EXPIRES_IN: 24h
       APP_MASTER_KEY: ${APP_MASTER_KEY:?Задайте APP_MASTER_KEY в .env (openssl rand -hex 32)}
