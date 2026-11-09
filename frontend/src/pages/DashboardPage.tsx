@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { cn } from 'cn'
 import { api } from '@/lib/api'
@@ -71,21 +72,34 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard title="Кампании" value={data?.totalCampaigns} icon={Megaphone} loading={isLoading} />
-        <StatCard title="Сотрудники" value={data?.totalEmployees} icon={Users} loading={isLoading} />
-        <StatCard title="Группы" value={data?.totalGroups} icon={Users} loading={isLoading} />
+        <StatCard title="Кампании" value={data?.totalCampaigns} icon={Megaphone} loading={isLoading} to="/campaigns" />
+        <StatCard title="Сотрудники" value={data?.totalEmployees} icon={Users} loading={isLoading} to="/employees" />
+        <StatCard title="Группы" value={data?.totalGroups} icon={Users} loading={isLoading} to="/employees" />
       </div>
 
       <div>
         <h2 className="mb-3 text-lg font-semibold">События кампаний</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-          <StatCard title="Отправлено" value={data?.events.sent} icon={Mail} loading={isLoading} />
-          <StatCard title="Открыто" value={data?.events.opened} icon={MailOpen} loading={isLoading} />
+          <StatCard
+            title="Отправлено"
+            value={data?.events.sent}
+            icon={Mail}
+            loading={isLoading}
+            to="/reports?filter=sent"
+          />
+          <StatCard
+            title="Открыто"
+            value={data?.events.opened}
+            icon={MailOpen}
+            loading={isLoading}
+            to="/reports?filter=opened"
+          />
           <StatCard
             title="Переходов по ссылке"
             value={data?.events.clicked}
             icon={MousePointerClick}
             loading={isLoading}
+            to="/reports?filter=clicked"
           />
           <StatCard
             title="Отправлено форм"
@@ -93,16 +107,20 @@ export default function DashboardPage() {
             icon={FileWarning}
             loading={isLoading}
             tone="warning"
+            to="/reports?filter=submitted"
           />
           {/* "Скомпрометировано" = уникальные сотрудники, введшие данные
               формы (не количество попыток) — факт ввода, не проверенная
-              реальная компрометация (это задача безопасников, не отчёта). */}
+              реальная компрометация (это задача безопасников, не отчёта).
+              Отдельного фильтра на /reports нет — ближайший эквивалент
+              "submitted" (ввод формы), ведёт туда же. */}
           <StatCard
             title="Скомпрометировано"
             value={data?.events.compromised}
             icon={KeyRound}
             loading={isLoading}
             tone="danger"
+            to="/reports?filter=submitted"
           />
           {/* Положительная метрика (в отличие от остальных — чем выше, тем
               лучше): сотрудник сам распознал подозрительное письмо. */}
@@ -112,6 +130,7 @@ export default function DashboardPage() {
             icon={ShieldCheck}
             loading={isLoading}
             tone="success"
+            to="/reports?filter=reportedPhishing"
           />
         </div>
       </div>
@@ -173,12 +192,15 @@ function StatCard({
   icon: Icon,
   loading,
   tone,
+  to,
 }: {
   title: string
   value?: number
   icon: React.ElementType
   loading: boolean
   tone?: 'warning' | 'success' | 'danger'
+  /** Задание §8: каждый показатель должен открывать соответствующую детализацию. */
+  to?: string
 }) {
   const iconClass =
     tone === 'warning'
@@ -188,8 +210,8 @@ function StatCard({
         : tone === 'danger'
           ? 'size-4 text-destructive'
           : 'size-4 text-muted-foreground'
-  return (
-    <Card>
+  const card = (
+    <Card className={cn(to && 'transition-colors hover:border-primary/40')}>
       <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
         {/* min-w-0 — без него flex-ребёнок не сжимается уже контента и
             выталкивает/наезжает на соседнюю иконку. break-words — "Скомпро-
@@ -202,5 +224,12 @@ function StatCard({
         {loading ? <Skeleton className="h-8 w-12" /> : <div className="text-3xl font-semibold">{value ?? 0}</div>}
       </CardContent>
     </Card>
+  )
+  return to ? (
+    <Link to={to} className="block">
+      {card}
+    </Link>
+  ) : (
+    card
   )
 }
