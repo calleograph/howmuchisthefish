@@ -3,6 +3,9 @@ import { ApiTags } from '@nestjs/swagger';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Public } from '../auth/public.decorator';
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- package.json не ESM-импортируемый JSON без resolveJsonModule; версия берётся отсюда, а не хардкодится здесь, чтобы не рассинхронизироваться при релизах.
+const { version } = require('../../../package.json');
+
 @ApiTags('health')
 @Controller('health')
 export class HealthController {
@@ -21,6 +24,6 @@ export class HealthController {
       checks.database = 'error';
     }
     const healthy = Object.values(checks).every((v) => v === 'ok');
-    return { status: healthy ? 'ok' : 'degraded', checks, version: '0.1.0' };
+    return { status: healthy ? 'ok' : 'degraded', checks, version };
   }
 }
