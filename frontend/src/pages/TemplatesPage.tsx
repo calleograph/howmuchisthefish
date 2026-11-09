@@ -94,7 +94,7 @@ export default function TemplatesPage() {
               </Button>
             }
           />
-          <DialogContent className="max-w-[640px]">
+          <DialogContent className="max-w-[1100px]">
             <DialogHeader>
               <DialogTitle>Новый почтовый шаблон</DialogTitle>
             </DialogHeader>
@@ -136,7 +136,7 @@ export default function TemplatesPage() {
                 <Textarea
                   id="tpl-mjml"
                   ref={textareaRef}
-                  className="min-h-[240px] font-mono text-sm"
+                  className="min-h-[420px] font-mono text-sm"
                   value={mjmlSource}
                   onChange={(e) => setMjmlSource(e.target.value)}
                 />
