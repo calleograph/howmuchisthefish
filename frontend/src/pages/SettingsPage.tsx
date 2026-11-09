@@ -303,7 +303,7 @@ function TestButton({ onTest }: { smtpId: string; onTest: (toAddress: string) =>
         placeholder="test@example.local"
         value={toAddress}
         onChange={(e) => setToAddress(e.target.value)}
-        className="h-8"
+        className="min-h-11"
       />
       <Button size="sm" variant="outline" disabled={!toAddress} onClick={() => onTest(toAddress)}>
         Тест
