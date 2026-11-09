@@ -2,7 +2,6 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import * as express from 'express';
 import helmet from 'helmet';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
@@ -18,7 +17,14 @@ async function bootstrap() {
   // интерфейсе. 10 МБ с запасом покрывает даже крупные одностраничные
   // сайты; дальнейший рост (видео/десятки МБ разметки) уже не является
   // учебной фишинговой страницей, упирать лимит в них незачем.
-  app.use(express.json({ limit: '10mb' }));
+  //
+  // app.use(express.json({limit})) НЕ сработал (живой тест на стенде —
+  // всё равно 413): NestJS с Express-адаптером регистрирует собственный
+  // body-parser раньше любого app.use(), добавленного вручную, так что
+  // он успевает отклонить тело первым. useBodyParser() — официальный,
+  // документированный способ переопределить именно встроенный парсер
+  // (docs.nestjs.com/faq/raw-body), а не добавить ещё один поверх.
+  app.useBodyParser('json', { limit: '10mb' });
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true, // отбрасывает поля, не описанные в DTO — защита от лишних полей в теле запроса
