@@ -13,6 +13,7 @@ import { EmployeesModule } from './modules/employees/employees.module';
 import { GroupsModule } from './modules/groups/groups.module';
 import { TemplatesModule } from './modules/templates/templates.module';
 import { PagesModule } from './modules/pages/pages.module';
+import { DomainsModule } from './modules/domains/domains.module';
 import { EventsModule } from './modules/events/events.module';
 import { SmtpModule } from './modules/smtp/smtp.module';
 import { MailerModule } from './modules/mailer/mailer.module';
@@ -55,6 +56,7 @@ import { UpdateModule } from './modules/admin/update/update.module';
     GroupsModule,
     TemplatesModule,
     PagesModule,
+    DomainsModule,
     EventsModule,
     SmtpModule,
     MailerModule,

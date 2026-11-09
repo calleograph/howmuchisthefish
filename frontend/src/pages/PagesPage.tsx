@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Plus, FileText, Globe, ShieldAlert } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -21,7 +22,14 @@ interface LandingPage {
   capturesCredentials: boolean
   screenshotPath: string | null
   sourceUrl: string | null
+  domainId: string | null
   updatedAt: string
+}
+
+interface Domain {
+  id: string
+  hostname: string
+  verificationStatus: 'PENDING' | 'VERIFIED' | 'FAILED'
 }
 
 const DEFAULT_HTML = `<!doctype html>
@@ -48,6 +56,13 @@ export default function PagesPage() {
   const [formEnabled, setFormEnabled] = useState(true)
   const [capturesCredentials, setCapturesCredentials] = useState(false)
   const [htmlSource, setHtmlSource] = useState(DEFAULT_HTML)
+  const [domainId, setDomainId] = useState<string>('')
+
+  const { data: domains } = useQuery({
+    queryKey: ['domains'],
+    queryFn: () => api.get<Domain[]>('/domains').then((r) => r.data),
+  })
+  const verifiedDomains = domains?.filter((d) => d.verificationStatus === 'VERIFIED') ?? []
 
   const { data, isLoading } = useQuery({
     queryKey: ['pages'],
@@ -63,6 +78,7 @@ export default function PagesPage() {
     setFormEnabled(true)
     setCapturesCredentials(false)
     setHtmlSource(DEFAULT_HTML)
+    setDomainId('')
   }
 
   const cloneMutation = useMutation({
@@ -77,7 +93,15 @@ export default function PagesPage() {
 
   const createMutation = useMutation({
     mutationFn: () =>
-      api.post('/pages', { name, slug, htmlSource, formEnabled, capturesCredentials, sourceUrl: sourceUrl || undefined }),
+      api.post('/pages', {
+        name,
+        slug,
+        htmlSource,
+        formEnabled,
+        capturesCredentials,
+        sourceUrl: sourceUrl || undefined,
+        domainId: domainId || undefined,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pages'] })
       toast.success('Страница создана')
@@ -161,6 +185,27 @@ export default function PagesPage() {
                   placeholder="owa-password-update"
                 />
               </div>
+              {verifiedDomains.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <Label>Домен публикации</Label>
+                  <Select value={domainId} onValueChange={(v) => setDomainId(v ?? '')}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Общий адрес системы">
+                        {(v: string) =>
+                          verifiedDomains.find((d) => d.id === v)?.hostname ?? 'Общий адрес системы'
+                        }
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {verifiedDomains.map((d) => (
+                        <SelectItem key={d.id} value={d.id}>
+                          {d.hostname}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <Switch id="pg-form" checked={formEnabled} onCheckedChange={setFormEnabled} />
                 <Label htmlFor="pg-form">Страница содержит форму для отслеживания отправки</Label>
@@ -241,6 +286,12 @@ export default function PagesPage() {
                   <Badge className="gap-1 bg-warning text-warning-foreground">
                     <ShieldAlert className="size-3" />
                     Захват значений
+                  </Badge>
+                )}
+                {page.domainId && (
+                  <Badge variant="outline" className="gap-1">
+                    <Globe className="size-3" />
+                    Свой домен
                   </Badge>
                 )}
               </div>

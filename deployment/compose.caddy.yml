@@ -4,6 +4,14 @@
 # "встроенный HTTPS" на шаге настройки).
 
 services:
+  backend:
+    environment:
+      # Отражается в GET /domains/tls-managed — UI "Домены" показывает,
+      # что сертификат на верифицированный домен выпустится автоматически
+      # (on-demand TLS, ask-эндпоинт — см. Caddyfile), а не предлагает
+      # администратору настраивать TLS вручную.
+      TLS_MODE: caddy
+
   caddy:
     image: caddy:2.9-alpine@sha256:b4e3952384eb9524a887633ce65c752dd7c71314d2c2acf98cd5c715aaa534f0
     restart: unless-stopped

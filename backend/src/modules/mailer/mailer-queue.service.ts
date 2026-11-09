@@ -101,7 +101,18 @@ export class MailerQueueService implements OnModuleInit, OnModuleDestroy {
       const publicBaseUrl = this.config
         .get<string>('PUBLIC_BASE_URL', '')
         .replace(/\/$/, '');
-      const landingUrl = `${publicBaseUrl}/lp/${campaign.page.slug}?token=${target.trackingToken}`;
+      // Если у страницы есть собственный верифицированный домен — ссылка на
+      // неё ведёт туда (похожий на цель URL для кампании), а служебные
+      // pixel/report-эндпоинты остаются на основном PUBLIC_BASE_URL — это
+      // backend-маршруты приложения, не часть похожей на цель страницы.
+      const page = await this.prisma.landingPage.findUnique({
+        where: { id: campaign.pageId },
+        include: { domain: true },
+      });
+      const landingBaseUrl = page?.domain
+        ? `https://${page.domain.hostname}`
+        : publicBaseUrl;
+      const landingUrl = `${landingBaseUrl}/lp/${campaign.page.slug}?token=${target.trackingToken}`;
       const pixelUrl = `${publicBaseUrl}/t/pixel.gif?token=${target.trackingToken}`;
       // Ссылка "Сообщить о фишинге" — шаблон может вставить её явной кнопкой
       // через {{reportPhishingUrl}}; не обязательна, просто доступна как

@@ -50,6 +50,7 @@ export const CONFIG_REGISTRY: ConfigFieldEntry[] = [
   { model: 'Group', field: '*', policy: 'data' },
   { model: 'MailTemplate', field: '*', policy: 'data' },
   { model: 'LandingPage', field: '*', policy: 'data' },
+  { model: 'Domain', field: '*', policy: 'data' }, // verificationToken не секрет — публичная DNS-запись
   { model: 'Campaign', field: '*', policy: 'data' },
   { model: 'CampaignTarget', field: '*', policy: 'data' },
   { model: 'CampaignEvent', field: '*', policy: 'data' },

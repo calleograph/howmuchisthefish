@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   Logger,
@@ -17,6 +18,20 @@ export class PagesService {
     private readonly prisma: PrismaService,
     private readonly screenshots: ScreenshotService,
   ) {}
+
+  // Привязать страницу можно только к верифицированному домену — незачем
+  // публиковать на домене, владение которым ещё не подтверждено DNS-записью
+  // (см. domains.service.ts verify()).
+  private async assertDomainUsable(domainId: string | null | undefined) {
+    if (!domainId) return;
+    const domain = await this.prisma.domain.findUnique({ where: { id: domainId } });
+    if (!domain) throw new NotFoundException('Домен не найден');
+    if (domain.verificationStatus !== 'VERIFIED') {
+      throw new BadRequestException(
+        'Домен ещё не верифицирован — сначала подтвердите владение через TXT-запись',
+      );
+    }
+  }
 
   // Fire-and-forget: не блокирует ответ на create/update, сервис скриншотов
   // опционален и может отсутствовать (до 15с на попытку соединения).
@@ -60,6 +75,7 @@ export class PagesService {
     });
     if (existing)
       throw new ConflictException('Страница с таким адресом уже существует');
+    await this.assertDomainUsable(dto.domainId);
     const page = await this.prisma.landingPage.create({
       data: {
         name: dto.name,
@@ -68,6 +84,7 @@ export class PagesService {
         formEnabled: dto.formEnabled ?? false,
         capturesCredentials: dto.capturesCredentials ?? false,
         sourceUrl: dto.sourceUrl,
+        domainId: dto.domainId,
       },
     });
     this.regenerateScreenshot(page.id, page.htmlSource);
@@ -88,6 +105,7 @@ export class PagesService {
 
   async update(id: string, dto: UpdatePageDto) {
     await this.get(id);
+    if (dto.domainId !== undefined) await this.assertDomainUsable(dto.domainId);
     const page = await this.prisma.landingPage.update({
       where: { id },
       data: {
@@ -95,6 +113,8 @@ export class PagesService {
         htmlSource: dto.htmlSource,
         formEnabled: dto.formEnabled,
         capturesCredentials: dto.capturesCredentials,
+        // null явно означает "отвязать домен, вернуться на PUBLIC_BASE_URL"
+        ...(dto.domainId !== undefined ? { domainId: dto.domainId } : {}),
       },
     });
     if (dto.htmlSource) this.regenerateScreenshot(page.id, page.htmlSource);

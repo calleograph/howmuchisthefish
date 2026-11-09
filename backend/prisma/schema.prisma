@@ -34,6 +34,12 @@ enum CampaignStatus {
   FAILED
 }
 
+enum DomainVerificationStatus {
+  PENDING // запись DNS ещё не найдена/не совпадает
+  VERIFIED // TXT-запись подтверждена, домен можно привязывать к странице
+  FAILED // последняя проверка явно не прошла (запись есть, но не совпадает, или DNS ошибка)
+}
+
 enum CampaignEventType {
   EMAIL_SENT
   EMAIL_OPENED
@@ -59,38 +65,38 @@ enum SegmentCondition {
 }
 
 model User {
-  id            String    @id @default(uuid())
-  email         String    @unique // @policy:data
-  passwordHash  String?   // @policy:hash — bcrypt-хэш локального пароля, null если вход только через OIDC/SAML
-  firstName     String    // @policy:data
-  lastName      String    // @policy:data
-  role          Role      @default(VIEWER) // @policy:data
-  mfaEnabled    Boolean   @default(false) // @policy:data
-  mfaSecret     String?   // @policy:secret
-  isActive      Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  auditLogs     AuditLog[]
+  id           String     @id @default(uuid())
+  email        String     @unique // @policy:data
+  passwordHash String? // @policy:hash — bcrypt-хэш локального пароля, null если вход только через OIDC/SAML
+  firstName    String // @policy:data
+  lastName     String // @policy:data
+  role         Role       @default(VIEWER) // @policy:data
+  mfaEnabled   Boolean    @default(false) // @policy:data
+  mfaSecret    String? // @policy:secret
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  auditLogs    AuditLog[]
 
   @@map("users")
 }
 
 // Сотрудники-цели кампаний — отдельная сущность от административных User.
 model Employee {
-  id          String   @id @default(uuid())
-  email       String   @unique // @policy:data
-  firstName   String   // @policy:data
-  lastName    String   // @policy:data
-  department  String?  // @policy:data
-  position    String?  // @policy:data
-  customFields Json    @default("{}") // @policy:data — значения доп. полей, ключи описаны в CustomFieldDef
-  isActive    Boolean  @default(true)
-  importedAt  DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(uuid())
+  email        String   @unique // @policy:data
+  firstName    String // @policy:data
+  lastName     String // @policy:data
+  department   String? // @policy:data
+  position     String? // @policy:data
+  customFields Json     @default("{}") // @policy:data — значения доп. полей, ключи описаны в CustomFieldDef
+  isActive     Boolean  @default(true)
+  importedAt   DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  groups        EmployeeGroup[]
-  targets       CampaignTarget[]
-  history       EmployeeHistory[]
+  groups  EmployeeGroup[]
+  targets CampaignTarget[]
+  history EmployeeHistory[]
 
   @@map("employees")
 }
@@ -101,10 +107,10 @@ model Employee {
 model CustomFieldDef {
   id           String          @id @default(uuid())
   key          String          @unique // @policy:data — используется как ключ в Employee.customFields
-  label        String          // @policy:data
+  label        String // @policy:data
   type         CustomFieldType // @policy:data
-  options      Json?           // @policy:data — список значений для ENUM-типа
-  defaultValue Json?           // @policy:data
+  options      Json? // @policy:data — список значений для ENUM-типа
+  defaultValue Json? // @policy:data
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
 
@@ -115,9 +121,9 @@ model EmployeeHistory {
   id         String   @id @default(uuid())
   employeeId String
   employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  changedBy  String?  // userId администратора, null для импорта
-  changeType String   // created | updated | imported | deactivated
-  diff       Json     // @policy:data — снимок изменённых полей (без значений форм кампаний)
+  changedBy  String? // userId администратора, null для импорта
+  changeType String // created | updated | imported | deactivated
+  diff       Json // @policy:data — снимок изменённых полей (без значений форм кампаний)
   createdAt  DateTime @default(now())
 
   @@map("employee_history")
@@ -126,15 +132,15 @@ model EmployeeHistory {
 model Group {
   id            String   @id @default(uuid())
   name          String   @unique // @policy:data
-  description   String?  // @policy:data
-  parentGroupId String?  // @policy:data — вложенные группы для оргструктуры (департамент → отдел)
+  description   String? // @policy:data
+  parentGroupId String? // @policy:data — вложенные группы для оргструктуры (департамент → отдел)
   parentGroup   Group?   @relation("GroupHierarchy", fields: [parentGroupId], references: [id], onDelete: SetNull)
   childGroups   Group[]  @relation("GroupHierarchy")
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  members     EmployeeGroup[]
-  targets     CampaignTarget[]
+  members EmployeeGroup[]
+  targets CampaignTarget[]
 
   @@map("groups")
 }
@@ -150,103 +156,130 @@ model EmployeeGroup {
 }
 
 model MailTemplate {
-  id          String   @id @default(uuid())
-  name        String   // @policy:data
-  subject     String   // @policy:data
-  mjmlSource  String   // @policy:data — исходник MJML
-  htmlCache   String   // @policy:data — скомпилированный HTML (кэш, пересчитывается из mjmlSource)
-  variables   Json     @default("[]") // @policy:data — список переменных персонализации
-  isArchived  Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(uuid())
+  name       String // @policy:data
+  subject    String // @policy:data
+  mjmlSource String // @policy:data — исходник MJML
+  htmlCache  String // @policy:data — скомпилированный HTML (кэш, пересчитывается из mjmlSource)
+  variables  Json     @default("[]") // @policy:data — список переменных персонализации
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  campaigns   Campaign[]
+  campaigns Campaign[]
 
   @@map("mail_templates")
 }
 
 model LandingPage {
-  id             String   @id @default(uuid())
-  name           String   // @policy:data
-  slug           String   @unique // @policy:data — публичный путь /lp/{slug}
-  htmlSource     String   // @policy:data — HTML учебной страницы (из конструктора, граббера или ручной правки)
-  formEnabled    Boolean  @default(false) // @policy:data
+  id                  String   @id @default(uuid())
+  name                String // @policy:data
+  slug                String   @unique // @policy:data — публичный путь /lp/{slug}
+  htmlSource          String // @policy:data — HTML учебной страницы (из конструктора, граббера или ручной правки)
+  formEnabled         Boolean  @default(false) // @policy:data
   // Явный opt-in за каждую страницу (не глобальная настройка): сохранять ли
   // зашифрованные значения полей при form_submitted, для проверки факта
   // реальной компрометации. По умолчанию выключено — большинству учебных
   // кампаний нужен только факт отправки, не содержимое. См. SECURITY.md.
-  capturesCredentials Boolean @default(false) // @policy:data
-  screenshotPath String?  // @policy:data — путь в storage к превью-скриншоту (генерируется при сохранении)
-  sourceUrl      String?  // @policy:data — исходный URL, если страница получена граббером (для аудита происхождения)
-  isArchived     Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  capturesCredentials Boolean  @default(false) // @policy:data
+  screenshotPath      String? // @policy:data — путь в storage к превью-скриншоту (генерируется при сохранении)
+  sourceUrl           String? // @policy:data — исходный URL, если страница получена граббером (для аудита происхождения)
+  // Опционально: публикация на отдельном домене вместо PUBLIC_BASE_URL.
+  // Домен должен быть VERIFIED — проверяется на уровне сервиса, не схемы.
+  domainId            String? // @policy:data
+  domain              Domain?  @relation(fields: [domainId], references: [id])
+  isArchived          Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
-  campaigns   Campaign[]
+  campaigns Campaign[]
 
   @@map("landing_pages")
 }
 
-model SmtpConfig {
-  id            String   @id @default(uuid())
-  name          String   // @policy:data
-  host          String   // @policy:data
-  port          Int      // @policy:data
-  secure        Boolean  @default(true) // @policy:data — TLS/STARTTLS
-  username      String?  // @policy:data
-  passwordEnc   String?  // @policy:secret — зашифровано APP_MASTER_KEY, не экспортируется в открытом виде
-  fromAddress   String   // @policy:data
-  isDefault     Boolean  @default(false)
-  lastTestAt    DateTime?
-  lastTestOk    Boolean?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+// Домены, которыми организация вправе распоряжаться, для публикации учебных
+// страниц не на общем PUBLIC_BASE_URL. Верификация владения — обязательный
+// шаг перед тем, как домен можно привязать к странице (см. domains.service.ts
+// verify()). TLS выпускается автоматически через Caddy on-demand TLS при
+// первом живом обращении — приложение не хранит сертификат/приватный ключ,
+// это ответственность Caddy (см. docs/ARCHITECTURE.md "Домены").
+model Domain {
+  id                 String                   @id @default(uuid())
+  hostname           String                   @unique // @policy:data — example.com, без схемы/порта/пути
+  // Случайный токен для верификации через TXT-запись
+  // _howmuchisthefish-challenge.{hostname} TXT "howmuchisthefish-verify={token}".
+  verificationToken  String                   @default(uuid()) // @policy:data — не секрет, но и незачем отдавать посторонним
+  verificationStatus DomainVerificationStatus @default(PENDING) // @policy:data
+  lastCheckedAt      DateTime? // @policy:data
+  lastCheckError     String? // @policy:data — причина последнего неуспеха, для UI
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
 
-  campaigns     Campaign[]
+  pages LandingPage[]
+
+  @@map("domains")
+}
+
+model SmtpConfig {
+  id          String    @id @default(uuid())
+  name        String // @policy:data
+  host        String // @policy:data
+  port        Int // @policy:data
+  secure      Boolean   @default(true) // @policy:data — TLS/STARTTLS
+  username    String? // @policy:data
+  passwordEnc String? // @policy:secret — зашифровано APP_MASTER_KEY, не экспортируется в открытом виде
+  fromAddress String // @policy:data
+  isDefault   Boolean   @default(false)
+  lastTestAt  DateTime?
+  lastTestOk  Boolean?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  campaigns Campaign[]
 
   @@map("smtp_configs")
 }
 
 model Campaign {
-  id            String         @id @default(uuid())
-  name          String         // @policy:data
-  status        CampaignStatus @default(DRAFT) // @policy:data
-  templateId    String
-  template      MailTemplate   @relation(fields: [templateId], references: [id])
-  pageId        String
-  page          LandingPage    @relation(fields: [pageId], references: [id])
-  smtpConfigId  String
-  smtpConfig    SmtpConfig     @relation(fields: [smtpConfigId], references: [id])
-  scheduledAt   DateTime?
-  startedAt     DateTime?
-  finishedAt    DateTime?
-  sendRateLimit Int            @default(10) // писем в минуту — @policy:data
+  id                     String         @id @default(uuid())
+  name                   String // @policy:data
+  status                 CampaignStatus @default(DRAFT) // @policy:data
+  templateId             String
+  template               MailTemplate   @relation(fields: [templateId], references: [id])
+  pageId                 String
+  page                   LandingPage    @relation(fields: [pageId], references: [id])
+  smtpConfigId           String
+  smtpConfig             SmtpConfig     @relation(fields: [smtpConfigId], references: [id])
+  scheduledAt            DateTime?
+  startedAt              DateTime?
+  finishedAt             DateTime?
+  sendRateLimit          Int            @default(10) // писем в минуту — @policy:data
   allowedDomainsOverride Json? // @policy:data — если задано, ограничивает адресатов этими доменами
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
 
-  targets       CampaignTarget[]
-  events        CampaignEvent[]
+  targets CampaignTarget[]
+  events  CampaignEvent[]
 
   @@map("campaigns")
 }
 
 model CampaignTarget {
-  id          String    @id @default(uuid())
-  campaignId  String
-  campaign    Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  employeeId  String?
-  employee    Employee? @relation(fields: [employeeId], references: [id])
-  groupId     String?
-  group       Group?    @relation(fields: [groupId], references: [id])
-  trackingToken String  @unique @default(uuid()) // используется в pixel/redirect ссылках, не ПДн само по себе
+  id               String    @id @default(uuid())
+  campaignId       String
+  campaign         Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  employeeId       String?
+  employee         Employee? @relation(fields: [employeeId], references: [id])
+  groupId          String?
+  group            Group?    @relation(fields: [groupId], references: [id])
+  trackingToken    String    @unique @default(uuid()) // используется в pixel/redirect ссылках, не ПДн само по себе
   // Источник таргетинга — для отображения "откуда взят этот получатель"
   // (ручной выбор/группа/сегмент прошлой кампании/случайная выборка).
-  sourceKind       String   @default("manual") // @policy:data — manual | group | segment | random
-  sourceCampaignId String?  // @policy:data — кампания-источник для segment-таргетинга
-  createdAt   DateTime  @default(now())
+  sourceKind       String    @default("manual") // @policy:data — manual | group | segment | random
+  sourceCampaignId String? // @policy:data — кампания-источник для segment-таргетинга
+  createdAt        DateTime  @default(now())
 
-  events      CampaignEvent[]
+  events CampaignEvent[]
 
   // Один сотрудник не может быть целью одной кампании дважды — делает addTargets
   // идемпотентным при повторном вызове (например при обновлении состава получателей).
@@ -265,16 +298,16 @@ model CampaignTarget {
 // осознанный компромисс, не исходная гарантия "невозможно даже при
 // компрометации сервера целиком" — см. docs/SECURITY.md для полного разбора.
 model CampaignEvent {
-  id          String            @id @default(uuid())
-  campaignId  String
-  campaign    Campaign          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  targetId    String
-  target      CampaignTarget    @relation(fields: [targetId], references: [id], onDelete: Cascade)
-  type        CampaignEventType // @policy:data
-  isSuspiciousAutomated Boolean @default(false) // @policy:data — похоже на сканер/почтовый клиент, не на человека
-  userAgent   String?           // @policy:data — точный User-Agent браузера, доступно без отдельного согласия (стандартный HTTP-заголовок)
-  ipAddress   String?           // @policy:data — точный IP, как получает его сервер (внешний/NAT-адрес клиента)
-  createdAt   DateTime          @default(now())
+  id                    String            @id @default(uuid())
+  campaignId            String
+  campaign              Campaign          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  targetId              String
+  target                CampaignTarget    @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  type                  CampaignEventType // @policy:data
+  isSuspiciousAutomated Boolean           @default(false) // @policy:data — похоже на сканер/почтовый клиент, не на человека
+  userAgent             String? // @policy:data — точный User-Agent браузера, доступно без отдельного согласия (стандартный HTTP-заголовок)
+  ipAddress             String? // @policy:data — точный IP, как получает его сервер (внешний/NAT-адрес клиента)
+  createdAt             DateTime          @default(now())
 
   credentials CapturedCredential[]
 
@@ -290,17 +323,17 @@ model CampaignEvent {
 // см. CryptoService.encryptCredential(). Чтение — только через явный
 // reveal-эндпоинт с ролью ADMIN и обязательной записью в AuditLog.
 model CapturedCredential {
-  id          String        @id @default(uuid())
+  id        String        @id @default(uuid())
   // НЕ @unique: одна отправка формы (один CampaignEvent) обычно содержит
   // несколько полей (login + password) — каждое уникальное значение поля
   // за эту отправку создаёт отдельную запись. Найдено реальным
   // тестированием: constraint-ошибка при >1 поле в форме.
-  eventId     String
-  event       CampaignEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  fieldName   String        // @policy:data — имя поля формы (login/password/email и т.п.), не секрет само по себе
-  valueEnc    String        // @policy:reset — AES-256-GCM, отдельный ключ (CREDENTIAL_ENCRYPTION_KEY, не APP_MASTER_KEY) — без исходного ключа на новом сервере не восстановить, см. SECURITY.md
-  valueHash   String        // @policy:hash — SHA-256 от исходного значения, для дедупликации БЕЗ расшифровки (см. "варианты ввода")
-  createdAt   DateTime      @default(now())
+  eventId   String
+  event     CampaignEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  fieldName String // @policy:data — имя поля формы (login/password/email и т.п.), не секрет само по себе
+  valueEnc  String // @policy:reset — AES-256-GCM, отдельный ключ (CREDENTIAL_ENCRYPTION_KEY, не APP_MASTER_KEY) — без исходного ключа на новом сервере не восстановить, см. SECURITY.md
+  valueHash String // @policy:hash — SHA-256 от исходного значения, для дедупликации БЕЗ расшифровки (см. "варианты ввода")
+  createdAt DateTime      @default(now())
 
   @@index([eventId])
   @@map("captured_credentials")
@@ -310,11 +343,11 @@ model AuditLog {
   id         String   @id @default(uuid())
   userId     String?
   user       User?    @relation(fields: [userId], references: [id])
-  action     String   // @policy:data
-  entityType String   // @policy:data
-  entityId   String?  // @policy:data
-  metadata   Json?    // @policy:data
-  ipAddress  String?  // @policy:data
+  action     String // @policy:data
+  entityType String // @policy:data
+  entityId   String? // @policy:data
+  metadata   Json? // @policy:data
+  ipAddress  String? // @policy:data
   createdAt  DateTime @default(now())
 
   @@map("audit_logs")
@@ -323,22 +356,22 @@ model AuditLog {
 // Общие настройки приложения — key/value с явной политикой на уровне записи
 // (используется config-registry.ts, т.к. набор ключей расширяемый).
 model Setting {
-  key         String   @id // @policy:data
-  value       Json     // политика зависит от key — см. config-registry.ts SETTINGS_POLICY
-  updatedAt   DateTime @updatedAt
+  key       String   @id // @policy:data
+  value     Json // политика зависит от key — см. config-registry.ts SETTINGS_POLICY
+  updatedAt DateTime @updatedAt
 
   @@map("settings")
 }
 
 model Backup {
-  id          String   @id @default(uuid())
-  label       String   // @policy:data
-  kind        String   // manual | scheduled | pre-update | pre-restore
-  filePath    String   // @policy:data — путь в storage, не содержимое
-  sizeBytes   BigInt
-  checksum    String   // @policy:data — sha256 для проверки целостности
-  encrypted   Boolean  @default(true)
-  createdAt   DateTime @default(now())
+  id        String   @id @default(uuid())
+  label     String // @policy:data
+  kind      String // manual | scheduled | pre-update | pre-restore
+  filePath  String // @policy:data — путь в storage, не содержимое
+  sizeBytes BigInt
+  checksum  String // @policy:data — sha256 для проверки целостности
+  encrypted Boolean  @default(true)
+  createdAt DateTime @default(now())
 
   @@map("backups")
 }

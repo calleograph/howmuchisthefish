@@ -47,6 +47,13 @@ export class CreatePageDto {
   @IsString()
   @MaxLength(2000)
   sourceUrl?: string;
+
+  @ApiPropertyOptional({
+    description: 'ID верифицированного домена для публикации вместо PUBLIC_BASE_URL',
+  })
+  @IsOptional()
+  @IsString()
+  domainId?: string;
 }
 
 export class UpdatePageDto {
@@ -70,6 +77,13 @@ export class UpdatePageDto {
   @IsOptional()
   @IsBoolean()
   capturesCredentials?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'ID верифицированного домена для публикации вместо PUBLIC_BASE_URL, null — вернуться на общий домен',
+  })
+  @IsOptional()
+  @IsString()
+  domainId?: string | null;
 }
 
 export class CloneUrlDto {

@@ -14,6 +14,7 @@ import {
   LogOut,
   Menu,
   X,
+  Globe,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -27,6 +28,7 @@ const NAV_ITEMS = [
   { to: '/employees', label: 'Сотрудники', icon: Users },
   { to: '/templates', label: 'Шаблоны писем', icon: Mail },
   { to: '/pages', label: 'Учебные страницы', icon: FileText },
+  { to: '/domains', label: 'Домены', icon: Globe },
   { to: '/reports', label: 'Аналитика', icon: BarChart3 },
   { to: '/settings', label: 'Настройки', icon: Settings },
 ]
