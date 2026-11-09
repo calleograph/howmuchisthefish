@@ -1,9 +1,12 @@
-import { Controller, Get, Header, Param, Query, Res } from '@nestjs/common';
+import { Controller, Get, Header, NotFoundException, Param, Query, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { ConfigService } from '@nestjs/config';
+import { createReadStream, existsSync } from 'fs';
+import { basename } from 'path';
 import { Public } from '../auth/public.decorator';
 import { PagesService } from './pages.service';
+import { ScreenshotService } from './screenshot.service';
 import { EventsService } from '../events/events.service';
 import { buildCapturingFormScript, buildSafeFormScript } from './safe-form-injector';
 
@@ -18,8 +21,24 @@ export class PublicPagesController {
   constructor(
     private readonly pages: PagesService,
     private readonly events: EventsService,
+    private readonly screenshots: ScreenshotService,
     private readonly config: ConfigService,
   ) {}
+
+  // Локально сохранённые ресурсы клонированной страницы (CSS/JS/картинки/
+  // шрифты) — см. screenshot.service.ts commitClonedAssets(). basename()
+  // отбрасывает любые "../" в параметре маршрута — защита от выхода за
+  // пределы папки ассетов конкретной страницы через путь в URL.
+  @Get(':slug/assets/:filename')
+  @Header('Cache-Control', 'public, max-age=31536000, immutable')
+  async asset(@Param('slug') slug: string, @Param('filename') filename: string, @Res() res: Response) {
+    const page = await this.pages.getBySlug(slug);
+    const safeFilename = basename(filename);
+    const filePath = this.screenshots.assetPath(page.id, safeFilename);
+    if (!existsSync(filePath)) throw new NotFoundException('Ресурс не найден');
+    res.set('Content-Type', contentTypeByExtension(safeFilename));
+    createReadStream(filePath).pipe(res);
+  }
 
   @Get(':slug')
   @Header('Cache-Control', 'no-store')
@@ -62,6 +81,28 @@ export class PublicPagesController {
     res.set('Content-Type', 'text/html; charset=utf-8');
     res.send(html);
   }
+}
+
+// Расширения соответствуют тем, что screenshot-service присваивает файлам
+// при клонировании (см. extForContentType в screenshot-service/server.js) —
+// держать в синхроне с тем списком, не произвольный общий mime-реестр.
+const EXT_CONTENT_TYPE: Record<string, string> = {
+  css: 'text/css',
+  js: 'application/javascript',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  gif: 'image/gif',
+  svg: 'image/svg+xml',
+  webp: 'image/webp',
+  ico: 'image/x-icon',
+  woff2: 'font/woff2',
+  woff: 'font/woff',
+  ttf: 'font/ttf',
+};
+
+function contentTypeByExtension(filename: string): string {
+  const ext = filename.split('.').pop()?.toLowerCase() ?? '';
+  return EXT_CONTENT_TYPE[ext] ?? 'application/octet-stream';
 }
 
 function injectBeforeBodyEnd(html: string, snippet: string): string {

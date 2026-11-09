@@ -54,6 +54,14 @@ export class CreatePageDto {
   @IsOptional()
   @IsString()
   domainId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'cloneId из ответа POST /pages/clone-preview — переносит скачанные ресурсы (CSS/JS/картинки) из временного хранилища под эту страницу',
+  })
+  @IsOptional()
+  @IsString()
+  cloneId?: string;
 }
 
 export class UpdatePageDto {

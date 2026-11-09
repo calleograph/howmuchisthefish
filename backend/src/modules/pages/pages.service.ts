@@ -87,6 +87,7 @@ export class PagesService {
         domainId: dto.domainId,
       },
     });
+    if (dto.cloneId) await this.screenshots.commitClonedAssets(dto.cloneId, page.id);
     this.regenerateScreenshot(page.id, page.htmlSource);
     return page;
   }
@@ -97,10 +98,16 @@ export class PagesService {
   // action/method формы (чтобы сетевой сбой JS-перехвата не отправил данные
   // на реальный сайт) — сама логика трекинга добавляется позже, при раздаче
   // через /lp/{slug} (см. public-pages.controller.ts), не здесь.
+  //
+  // Ресурсы (CSS/JS/картинки/шрифты), перехваченные при рендере, сохраняются
+  // ВО ВРЕМЕННУЮ папку под cloneId (см. screenshot.service.ts) — страница
+  // остаётся самостоятельной копией, не зависящей от исходного сайта после
+  // сохранения. cloneId возвращается клиенту и должен быть передан обратно
+  // в CreatePageDto.cloneId при сохранении — иначе ассеты останутся orphan.
   async clonePreview(url: string) {
-    const rawHtml = await this.screenshots.clone(url);
+    const { html: rawHtml, cloneId, assetCount } = await this.screenshots.clone(url);
     const htmlSource = rewriteFormsForCapture(rawHtml);
-    return { htmlSource, sourceUrl: url };
+    return { htmlSource, sourceUrl: url, cloneId, assetCount };
   }
 
   async update(id: string, dto: UpdatePageDto) {

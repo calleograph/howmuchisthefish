@@ -79,6 +79,7 @@ export default function PageEditorPage() {
   const [previewWidth, setPreviewWidth] = useState<'desktop' | 'mobile'>('desktop')
   const [cloneOpen, setCloneOpen] = useState(false)
   const [cloneUrl, setCloneUrl] = useState('')
+  const [cloneId, setCloneId] = useState<string | null>(null)
 
   const { data: existing } = useQuery({
     queryKey: ['pages', id],
@@ -109,31 +110,44 @@ export default function PageEditorPage() {
   const cloneMutation = useMutation({
     mutationFn: () =>
       api
-        .post<{ htmlSource: string; sourceUrl: string }>('/pages/clone-preview', { url: cloneUrl })
+        .post<{ htmlSource: string; sourceUrl: string; cloneId: string; assetCount: number }>(
+          '/pages/clone-preview',
+          { url: cloneUrl },
+        )
         .then((r) => r.data),
     onSuccess: (result) => {
       setHtmlSource(result.htmlSource)
       setSourceUrl(result.sourceUrl)
+      setCloneId(result.cloneId)
       setCloneOpen(false)
       setCloneUrl('')
-      toast.success('Страница загружена — проверьте разметку и сохраните')
+      toast.success(
+        result.assetCount > 0
+          ? `Страница загружена вместе с ${result.assetCount} локальными ресурсами — проверьте разметку и сохраните`
+          : 'Страница загружена — проверьте разметку и сохраните',
+      )
     },
     onError: (err: any) => toast.error(err.response?.data?.message ?? 'Не удалось загрузить страницу'),
   })
 
-  const body = {
-    name,
-    slug,
-    htmlSource,
-    formEnabled,
-    capturesCredentials,
-    sourceUrl: sourceUrl || undefined,
-    domainId: domainId || undefined,
-  }
-
   const saveMutation = useMutation({
-    mutationFn: () =>
-      isNew ? api.post<LandingPage>('/pages', body) : api.patch<LandingPage>(`/pages/${id}`, body),
+    mutationFn: () => {
+      const common = {
+        name,
+        slug,
+        htmlSource,
+        formEnabled,
+        capturesCredentials,
+        sourceUrl: sourceUrl || undefined,
+        domainId: domainId || undefined,
+      }
+      // cloneId принимается только CreatePageDto (перенос временных ассетов
+      // клона под новую страницу) — UpdatePageDto его не знает, лишнее поле
+      // упадёт на whitelist-валидации backend.
+      return isNew
+        ? api.post<LandingPage>('/pages', { ...common, cloneId: cloneId || undefined })
+        : api.patch<LandingPage>(`/pages/${id}`, common)
+    },
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['pages'] })
       toast.success(isNew ? 'Страница создана' : 'Изменения сохранены')
