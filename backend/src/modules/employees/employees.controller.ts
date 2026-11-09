@@ -85,12 +85,6 @@ export class EmployeesController {
   }
 
   @Roles('ADMIN', 'EDITOR')
-  @Post(':id/deactivate')
-  deactivate(@Param('id') id: string, @Request() req: any) {
-    return this.employees.deactivate(id, req.user?.id ?? null);
-  }
-
-  @Roles('ADMIN', 'EDITOR')
   @Post('bulk/assign-group')
   bulkAssignGroup(@Body() dto: BulkAssignGroupDto) {
     return this.employees.bulkAssignGroup(dto.employeeIds, dto.groupId);
@@ -107,6 +101,13 @@ export class EmployeesController {
   bulkUpdateFields(@Body() dto: BulkUpdateFieldsDto, @Request() req: any) {
     const { employeeIds, ...fields } = dto;
     return this.employees.bulkUpdateFields(employeeIds, fields, req.user?.id ?? null);
+  }
+
+  // Объявлен ПОСЛЕ bulk/* — иначе POST /employees/bulk/deactivate матчится как :id=bulk.
+  @Roles('ADMIN', 'EDITOR')
+  @Post(':id/deactivate')
+  deactivate(@Param('id') id: string, @Request() req: any) {
+    return this.employees.deactivate(id, req.user?.id ?? null);
   }
 
   @Roles('ADMIN', 'EDITOR')
