@@ -56,6 +56,21 @@ export class PublicPagesController {
     const page = await this.pages.getBySlug(slug);
 
     let html = page.htmlSource;
+    // HTML ссылается на ресурсы относительным путём "assets/{filename}"
+    // (так их записал screenshot-service при клонировании — см.
+    // extForContentType/rewrite в screenshot-service/server.js). Без <base>
+    // браузер резолвит "assets/..." относительно /lp/ (убирая последний
+    // сегмент пути — slug), а не относительно /lp/{slug}/, запросы уходят
+    // не туда (найдено живым тестом: /lp/assets/asset-0.css вместо
+    // /lp/{slug}/assets/asset-0.css, 404). Вставляется только если у
+    // страницы реально есть граббер-происхождение — не нужен обычным
+    // страницам без внешних ресурсов.
+    if (page.sourceUrl) {
+      const baseHref = `/lp/${slug}/`;
+      html = /<head[^>]*>/i.test(html)
+        ? html.replace(/<head[^>]*>/i, (match) => `${match}<base href="${baseHref}">`)
+        : `<base href="${baseHref}">${html}`;
+    }
     if (token) {
       // Токен должен существовать — иначе произвольный/угаданный токен не должен
       // давать возможность регистрировать события под видом реальной цели кампании.
