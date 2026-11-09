@@ -10,6 +10,7 @@ import EmployeesPage from '@/pages/EmployeesPage'
 import EmployeeDetailPage from '@/pages/EmployeeDetailPage'
 import TemplatesPage from '@/pages/TemplatesPage'
 import PagesPage from '@/pages/PagesPage'
+import PageEditorPage from '@/pages/PageEditorPage'
 import DomainsPage from '@/pages/DomainsPage'
 import CampaignsPage from '@/pages/CampaignsPage'
 import CampaignDetailPage from '@/pages/CampaignDetailPage'
@@ -40,6 +41,8 @@ export default function App() {
               <Route path="employees/:id" element={<EmployeeDetailPage />} />
               <Route path="templates" element={<TemplatesPage />} />
               <Route path="pages" element={<PagesPage />} />
+              <Route path="pages/new" element={<PageEditorPage />} />
+              <Route path="pages/:id/edit" element={<PageEditorPage />} />
               <Route path="domains" element={<DomainsPage />} />
               <Route path="campaigns" element={<CampaignsPage />} />
               <Route path="campaigns/:id" element={<CampaignDetailPage />} />
