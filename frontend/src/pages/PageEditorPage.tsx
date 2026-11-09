@@ -178,8 +178,8 @@ export default function PageEditorPage() {
               <div className="flex flex-col gap-3">
                 <p className="text-sm text-muted-foreground">
                   Загружает страницу через headless-браузер (работает и для SPA/JS-форм), переписывает форму на
-                  безопасную отправку. Ресурсы (CSS/JS/картинки) продолжают подгружаться с исходного сайта — пока он
-                  доступен.
+                  безопасную отправку. Ресурсы (CSS/JS/картинки/шрифты) сохраняются локально — страница не зависит
+                  от дальнейшей доступности исходного сайта.
                 </p>
                 <Input
                   placeholder="https://example.com/login"
