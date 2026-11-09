@@ -55,7 +55,12 @@ sap_missing_prereqs() {
     fi
   done
   if ! sap_check_docker_compose_plugin; then
-    missing+=("docker-compose-plugin:docker-compose-plugin")
+    # Имя apt-пакета для `docker compose` плагина — docker-compose-v2 на
+    # Ubuntu/Debian из стандартных репозиториев (проверено реальной
+    # установкой на чистой Ubuntu 26.04: пакета docker-compose-plugin там
+    # нет, это ошибочное предположение по памяти, не проверенное install.sh
+    # на настоящей системе до этого прогона).
+    missing+=("docker-compose-plugin:docker-compose-v2")
   fi
   # printf с пустым массивом всё равно даёт одну пустую строку вывода —
   # mapfile в вызывающем коде тогда считает это одним (пустым) элементом.

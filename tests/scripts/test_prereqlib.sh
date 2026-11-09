@@ -38,8 +38,25 @@ test_missing_prereqs_lists_one_missing() {
   assert_eq "правильный формат записи" "docker:docker.io" "${result[0]}"
 }
 
+test_missing_prereqs_lists_one_missing
+
+# Регрессия: имя apt-пакета для docker compose было ошибочно предположено
+# как "docker-compose-plugin" (не существует на Ubuntu/Debian из стандартных
+# репозиториев) — найдено реальной установкой на чистой Ubuntu 26.04,
+# правильное имя docker-compose-v2. Этот тест фиксирует правильное имя,
+# чтобы предположение не вернулось незамеченным.
+test_docker_compose_package_name_is_v2() {
+  sap_check_command() { return 0; }
+  sap_check_docker_compose_plugin() { return 1; }
+
+  mapfile -t result < <(sap_missing_prereqs)
+  assert_eq "ровно один недостающий пакет (docker compose)" "1" "${#result[@]}"
+  assert_eq "правильное имя apt-пакета для docker compose" "docker-compose-plugin:docker-compose-v2" "${result[0]}"
+}
+
 test_missing_prereqs_empty_when_all_installed
 test_missing_prereqs_lists_one_missing
+test_docker_compose_package_name_is_v2
 
 if [ "$FAILED" -ne 0 ]; then
   echo "ТЕСТЫ НЕ ПРОШЛИ" >&2
