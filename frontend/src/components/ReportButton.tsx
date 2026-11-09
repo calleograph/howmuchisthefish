@@ -107,7 +107,7 @@ export function ReportButton({
       />
       <DialogContent className="max-w-[720px]">
         <DialogHeader>
-          <DialogTitle>Отчёт — {label}</DialogTitle>
+          <DialogTitle>{label}</DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">

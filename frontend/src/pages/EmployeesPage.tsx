@@ -116,7 +116,7 @@ export default function EmployeesPage() {
             <Download className="size-4" />
             Экспорт CSV
           </Button>
-          <ReportButton type="employees" label="Отчёт" />
+          <ReportButton type="employees" label="Отчёт по сотрудникам (XLSX)" />
           <input ref={fileInput} type="file" accept=".csv" hidden onChange={handleFileChange} />
           <Button onClick={() => fileInput.current?.click()} disabled={importMutation.isPending}>
             <Upload className="size-4" />
