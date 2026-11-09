@@ -74,6 +74,25 @@ if [ "$target_version" = "$current_version" ]; then
   exit 0
 fi
 
+# Защита от отката версии: найдено реальным тестированием — если
+# разрабатываемая версия ещё не опубликована тегом на GitHub (как сейчас),
+# "последний релиз" API вернёт версию СТАРШЕ установленной. Frontend это
+# уже не даёт запросить (см. UpdateTab.tsx isNewerVersion), но root-helper
+# не должен доверять этому — вторая линия защиты перед реальным git
+# checkout на более старую версию.
+is_version_newer() {
+  local candidate="$1" current="$2"
+  python3 -I -c "
+import sys
+def parts(v): return [int(x) if x.isdigit() else 0 for x in v.split('.')[:3]] + [0,0,0]
+c, u = parts('$candidate'), parts('$current')
+sys.exit(0 if c[:3] > u[:3] else 1)
+"
+}
+if ! is_version_newer "$target_version" "$current_version"; then
+  fail "Целевая версия $target_version не новее установленной $current_version — обновление отклонено (защита от отката)" "skipped" "skipped" "skipped"
+fi
+
 step "backup"
 bash "$PROJECT_ROOT/scripts/backup.sh" --label "pre-update-v$target_version" >>"$LOG_FILE" 2>&1 \
   || fail "Резервное копирование не удалось — обновление остановлено до внесения изменений"

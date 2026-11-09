@@ -75,6 +75,20 @@ const OUTCOME_LABEL: Record<string, string> = {
   healthcheck: 'Работоспособность',
 }
 
+// Числовое сравнение major.minor.patch — не просто "!==". Найдено реальным
+// тестированием на стенде: последний опубликованный релиз на GitHub (0.2.0)
+// оказался СТАРШЕ установленной на стенде версии (0.3.0, ещё не выпущена
+// тегом) — простое неравенство показывало бы кнопку "Обновить до 0.2.0"
+// как доступную, хотя это откат, не обновление.
+function isNewerVersion(candidate: string, current: string): boolean {
+  const toParts = (v: string) => v.split('.').map((n) => Number(n) || 0)
+  const [cMaj, cMin, cPatch] = toParts(candidate)
+  const [curMaj, curMin, curPatch] = toParts(current)
+  if (cMaj !== curMaj) return cMaj > curMaj
+  if (cMin !== curMin) return cMin > curMin
+  return cPatch > curPatch
+}
+
 export function UpdateTab() {
   const queryClient = useQueryClient()
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -134,7 +148,8 @@ export function UpdateTab() {
     onError: (err: any) => toast.error(err.response?.data?.message ?? 'Не удалось выполнить действие'),
   })
 
-  const hasUpdate = ov?.version && ov.version.latestVersion && ov.version.latestVersion !== ov.installedVersion
+  const hasUpdate =
+    ov?.version && ov.version.latestVersion && isNewerVersion(ov.version.latestVersion, ov.installedVersion)
 
   return (
     <div className="flex flex-col gap-4">
