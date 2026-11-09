@@ -13,6 +13,7 @@ import PagesPage from '@/pages/PagesPage'
 import PageEditorPage from '@/pages/PageEditorPage'
 import DomainsPage from '@/pages/DomainsPage'
 import CampaignsPage from '@/pages/CampaignsPage'
+import CampaignWizardPage from '@/pages/CampaignWizardPage'
 import CampaignDetailPage from '@/pages/CampaignDetailPage'
 import ReportsPage from '@/pages/ReportsPage'
 import SettingsPage from '@/pages/SettingsPage'
@@ -45,6 +46,7 @@ export default function App() {
               <Route path="pages/:id/edit" element={<PageEditorPage />} />
               <Route path="domains" element={<DomainsPage />} />
               <Route path="campaigns" element={<CampaignsPage />} />
+              <Route path="campaigns/new" element={<CampaignWizardPage />} />
               <Route path="campaigns/:id" element={<CampaignDetailPage />} />
               <Route path="reports" element={<ReportsPage />} />
               <Route path="settings" element={<SettingsPage />} />
