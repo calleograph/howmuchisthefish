@@ -79,8 +79,13 @@ export class MailerQueueService implements OnModuleInit, OnModuleDestroy {
     let i = 0;
     for (const target of campaign.targets) {
       const jobData: SendJobData = { campaignId, targetId: target.id };
+      // retry-параметры передаются на каждую задачу: createQueue не обновляет
+      // уже существующую очередь, и настройка из onModuleInit на установках,
+      // где очередь создана раньше, не применялась бы (найдено по pgboss.job.retry_limit=2).
       await this.boss.send(QUEUE_NAME, jobData, {
         startAfter: i * delaySeconds,
+        retryLimit: RETRY_LIMIT,
+        retryBackoff: true,
       });
       i++;
     }
