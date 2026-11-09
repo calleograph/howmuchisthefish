@@ -187,7 +187,7 @@ export default function CampaignWizardPage() {
             type="button"
             disabled={i > stepIndex}
             onClick={() => i <= stepIndex && setStepIndex(i)}
-            className={`flex min-h-[44px] items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`flex min-h-[44px] items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium transition-colors ${
               i === stepIndex
                 ? 'border-primary bg-primary text-primary-foreground'
                 : i < stepIndex
