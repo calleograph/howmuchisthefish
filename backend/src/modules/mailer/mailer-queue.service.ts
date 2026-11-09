@@ -41,9 +41,19 @@ export class MailerQueueService implements OnModuleInit, OnModuleDestroy {
     await this.boss.start();
     // pg-boss v12: очередь не создаётся неявно при первом send/work — нужно явно.
     // createQueue идемпотентен (безопасно вызывать при каждом старте приложения).
-    await this.boss.createQueue(QUEUE_NAME);
+    // retryLimit/retryBackoff — закрывает shortcut из предыдущей версии
+    // ("без повторных попыток отправки"): временный сбой SMTP (сеть,
+    // перегрузка релея) не должен означать "письмо никогда не уйдёт" —
+    // см. матрицу docs/FUNCTIONAL_GAP_MATRIX.md §9. 3 попытки с
+    // экспоненциальной задержкой (не бесконечно) покрывают и постоянные
+    // сбои (неверный email и т.п.) — после исчерпания лимита письмо
+    // просто не получает EMAIL_SENT, как и раньше, видно в отчёте кампании.
+    await this.boss.createQueue(QUEUE_NAME, {
+      retryLimit: 3,
+      retryBackoff: true,
+    });
     await this.boss.work<SendJobData>(QUEUE_NAME, async ([job]) =>
-      this.handleSend(job.data),
+      this.handleSend(job.data, job.retryCount),
     );
   }
 
@@ -73,7 +83,7 @@ export class MailerQueueService implements OnModuleInit, OnModuleDestroy {
     return { enqueued: campaign.targets.length };
   }
 
-  private async handleSend(data: SendJobData) {
+  private async handleSend(data: SendJobData, retryCount: number) {
     const target = await this.prisma.campaignTarget.findUnique({
       where: { id: data.targetId },
       include: {
@@ -88,11 +98,30 @@ export class MailerQueueService implements OnModuleInit, OnModuleDestroy {
       const transport = await this.smtp.getTransportForCampaign(
         campaign.smtpConfigId,
       );
+      // department/position/customFields уже есть в модели Employee, но не
+      // попадали в реальную рассылку (только firstName/lastName) — малое
+      // доделывание из матрицы, docs/FUNCTIONAL_GAP_MATRIX.md §4.
+      // customFields (произвольный JSON — text/number/boolean/select из
+      // CustomFieldDef) приводится к строке: renderWithData ожидает
+      // Record<string, string>, значения могут быть не строками. Идёт
+      // ПЕРВЫМ в объекте — явные поля ниже (firstName и т.д.) всегда
+      // побеждают при совпадении ключа, а не наоборот.
+      const customFieldsRaw =
+        typeof target.employee.customFields === 'object' &&
+        target.employee.customFields !== null
+          ? (target.employee.customFields as Record<string, unknown>)
+          : {};
+      const customFields = Object.fromEntries(
+        Object.entries(customFieldsRaw).map(([key, value]) => [key, String(value ?? '')]),
+      );
       const { html } = await this.mjml.renderWithData(
         campaign.template.mjmlSource,
         {
+          ...customFields,
           firstName: target.employee.firstName,
           lastName: target.employee.lastName,
+          department: target.employee.department ?? '',
+          position: target.employee.position ?? '',
         },
       );
       const smtpConfig = await this.smtp.get(campaign.smtpConfigId);
@@ -141,12 +170,16 @@ export class MailerQueueService implements OnModuleInit, OnModuleDestroy {
         },
       });
     } catch (err: any) {
+      // retryLimit=3 задан на уровне очереди (onModuleInit) — re-throw даёт
+      // pg-boss повторить задачу с экспоненциальной задержкой; после
+      // последней исчерпанной попытки письмо просто не получает EMAIL_SENT
+      // (видно в отчёте кампании как "не отправлено"), не создаём отдельный
+      // тип события для провала — в модели его сейчас нет, а домысливать
+      // новый enum-кейс ради лог-сообщения избыточно.
       this.logger.error(
-        `Не удалось отправить письмо цели ${target.id}: ${err.message}`,
+        `Не удалось отправить письмо цели ${target.id} (попытка ${retryCount + 1}): ${err.message}`,
       );
-      // shortcut: без повторных попыток отправки конкретного письма в 0.1.0 — сбой
-      // просто не создаёт EMAIL_SENT, видно в отчёте как "не отправлено"; upgrade:
-      // добавить retry с ограничением попыток, если доставка окажется нестабильной.
+      throw err;
     }
   }
 }
