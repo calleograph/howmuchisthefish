@@ -21,7 +21,16 @@ function Tabs({
         // растягивался на высоту соседней TabsContent. Заменено на стандартный
         // data-[orientation=...] синтаксис, который Tailwind v4 поддерживает
         // "из коробки" в т.ч. для именованных групп (group-data-[...]/name:).
-        "group/tabs flex gap-2 data-[orientation=vertical]:flex-col",
+        //
+        // Второй найденный баг того же бага-источника: базовое направление
+        // здесь было flex (строка), а flex-col применялся только при
+        // orientation=vertical — перевёрнутая логика. Для единственной
+        // используемой в продукте ориентации (horizontal: список вкладок
+        // сверху, контент под ним) корень должен быть flex-col по умолчанию,
+        // а flex-row — исключение для vertical. Из-за этого TabsContent
+        // вставал СБОКУ от TabsList, а не под ним (например, полностью ломало
+        // поле URL во вкладке "Клонировать по адресу" — сжато до 22px).
+        "group/tabs flex flex-col gap-2 data-[orientation=vertical]:flex-row",
         className
       )}
       {...props}
