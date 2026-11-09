@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { cn } from 'cn'
 import { api } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -189,9 +190,11 @@ function StatCard({
           : 'size-4 text-muted-foreground'
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-        <Icon className={iconClass} />
+      <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+        {/* min-w-0 — без него flex-ребёнок не сжимается уже и длинный
+            заголовок выталкивает/обрезает себя об соседнюю иконку. */}
+        <CardTitle className="min-w-0 text-sm font-medium text-muted-foreground">{title}</CardTitle>
+        <Icon className={cn('shrink-0', iconClass)} />
       </CardHeader>
       <CardContent>
         {loading ? <Skeleton className="h-8 w-12" /> : <div className="text-3xl font-semibold">{value ?? 0}</div>}
